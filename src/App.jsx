@@ -1,27 +1,50 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 
 export default function PortalPagosPasaje() {
   const [vecinos, setVecinos] = useState([]);
-  const [archivoExcel, setArchivoExcel] = useState(null);
   const [filtroParcela, setFiltroParcela] = useState('');
   const [filtroSitio, setFiltroSitio] = useState('');
+  const [filtroNombre, setFiltroNombre] = useState('');
 
-  const cargarExcel = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  useEffect(() => {
+    cargarExcelAutomatico();
+  }, []);
 
-    setArchivoExcel(file);
+  const cargarExcelAutomatico = async () => {
+    try {
+      const response = await fetch('/PLANILLA%20GASTOS%20COMUNES.xlsx');
 
-    const reader = new FileReader();
+      if (!response.ok) {
+        throw new Error('No se encontró la planilla automática');
+      }
 
-    reader.onload = (evt) => {
-      const data = new Uint8Array(evt.target.result);
+      const data = await response.arrayBuffer();
+
       const workbook = XLSX.read(data, { type: 'array' });
+
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        console.error('La planilla no tiene hojas');
+        return;
+      }
+
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
+
+      if (!worksheet) {
+        console.error('No se pudo leer la hoja del Excel');
+        return;
+      }
+
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
+      procesarDatosExcel(jsonData);
+      } catch (error) {
+      console.error('Error cargando planilla automática', error);
+    }
+  };
+
+  const procesarDatosExcel = (jsonData) => {
       const vecinosExcel = jsonData.map((fila, index) => {
         const codigo = String(
           fila['PARC/ST'] || fila['SITIO'] || fila['PARCELA'] || ''
@@ -91,19 +114,16 @@ export default function PortalPagosPasaje() {
             return valor && String(valor).trim() !== '';
           })
           .map((mes) => ({
-            mes: mes === 'MAYONESA' ? 'MAYO' : mes,
+            mes: mes,
             monto: limpiarNumero(fila[mes]),
             montoEsperado: valorMes[mes] || 0,
             incompleto: limpiarNumero(fila[mes]) < (valorMes[mes] || 0)
           }));
 
         const mesesPendientes = [...new Set(
-          todosLosMeses
-            .filter((mes) => {
-              const mesNormalizado = mes === 'MAYONESA' ? 'MAYO' : mes;
-              return !mesesPagados.some((item) => item.mes === mesNormalizado);
-            })
-            .map((mes) => (mes === 'MAYONESA' ? 'MAYO' : mes))
+          todosLosMeses.filter((mes) => {
+            return !mesesPagados.some((item) => item.mes === mes);
+          })
         )];
 
         const totalPagado = mesesPagados.reduce(
@@ -130,7 +150,7 @@ export default function PortalPagosPasaje() {
 
         const cortaFuego = limpiarNumero(
           fila['CORTA FUEGO'] ??
-          fila['CORTA\\nFUEGO'] ??
+          fila['CORTA\nFUEGO'] ??
           fila['CORTAFUEGO'] ??
           fila['CORTA  FUEGO'] ??
           fila['CORTA-FUEGO'] ??
@@ -145,10 +165,7 @@ export default function PortalPagosPasaje() {
           0
         );
 
-        const mesesPagadosCorregidos = mesesPagados.map((item) => ({
-          ...item,
-          mes: item.mes === 'MAYONESA' ? 'MAYO' : item.mes
-        }));
+        const mesesPagadosCorregidos = mesesPagados;
 
         return {
           id: index + 1,
@@ -161,9 +178,7 @@ export default function PortalPagosPasaje() {
           monto: fila['TOTAL'] ? `$${fila['TOTAL']}` : '$0',
           estado: fila['ESTADO'] || 'Pendiente',
           mesesPagados: mesesPagadosCorregidos,
-          mesesPendientes: mesesPendientes.map((mes) =>
-            mes === 'MAYONESA' ? 'MAYO' : mes
-          ),
+          mesesPendientes,
           totalPagado,
           totalPendiente: totalPendiente + cortaFuego,
           cortaFuego
@@ -171,13 +186,13 @@ export default function PortalPagosPasaje() {
       });
 
       setVecinos(vecinosExcel);
-    };
-
-    reader.readAsArrayBuffer(file);
   };
 
   const vecinosFiltrados = vecinos.filter((vecino) => {
-    const hayFiltro = filtroParcela.trim() !== '' || filtroSitio.trim() !== '';
+    const hayFiltro =
+      filtroParcela.trim() !== '' ||
+      filtroSitio.trim() !== '' ||
+      filtroNombre.trim() !== '';
 
     if (!hayFiltro) return false;
 
@@ -189,7 +204,17 @@ export default function PortalPagosPasaje() {
       ? vecino.sitio.includes(filtroSitio)
       : true;
 
-    return coincideParcela && coincideSitio;
+    const coincideNombre = filtroNombre
+      ? filtroNombre
+          .toLowerCase()
+          .split(' ')
+          .filter(Boolean)
+          .every((parte) =>
+            vecino.nombre.toLowerCase().includes(parte)
+          )
+      : true;
+
+    return coincideParcela && coincideSitio && coincideNombre;
   });
 
   return (
@@ -204,8 +229,8 @@ export default function PortalPagosPasaje() {
             />
 
             <div>
-              <h1 className="text-4xl font-bold text-slate-900">
-                Portal de Pago Comunidad Lomas del Valle Longotoma
+              <h1 className="text-2xl md:text-4xl font-bold text-slate-900 leading-tight">
+                Comunidad Lomas del Valle Longotoma
               </h1>
               <p className="text-slate-500 mt-2 text-lg">
                 Busca vecinos por parcela o sitio y revisa su estado.
@@ -218,21 +243,16 @@ export default function PortalPagosPasaje() {
           <div className="grid md:grid-cols-3 gap-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Subir Excel
+                Buscar por Nombre Completo
               </label>
               <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={cargarExcel}
-                className="w-full border border-slate-300 rounded-2xl px-4 py-3 bg-white"
+                type="text"
+                placeholder="Ej: Juan Pérez González"
+                value={filtroNombre}
+                onChange={(e) => setFiltroNombre(e.target.value)}
+                className="w-full border border-slate-300 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              {archivoExcel && (
-                <p className="text-sm text-emerald-700 mt-2">
-                  Archivo cargado: {archivoExcel.name}
-                </p>
-              )}
             </div>
-
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Buscar por Parcela
@@ -261,9 +281,9 @@ export default function PortalPagosPasaje() {
           </div>
 
           <div className="space-y-4">
-            {filtroParcela === '' && filtroSitio === '' ? (
+            {filtroParcela === '' && filtroSitio === '' && filtroNombre === '' ? (
               <div className="bg-slate-50 rounded-3xl p-10 text-center text-slate-500">
-                Ingresa una parcela o sitio para buscar un vecino.
+                Ingresa una parcela, sitio o nombre completo para buscar un vecino.
               </div>
             ) : vecinosFiltrados.length === 0 ? (
               <div className="bg-slate-50 rounded-3xl p-10 text-center text-slate-500">
@@ -376,7 +396,7 @@ export default function PortalPagosPasaje() {
                               key={mes}
                               className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-medium"
                             >
-                              {mes === 'MAYONESA' ? 'MAYO' : mes} - $
+                              {mes} - $
                               {(mes === 'ENERO' || mes === 'FEBRERO'
                                 ? 10000
                                 : mes === 'MARZO' || mes === 'ABRIL'
