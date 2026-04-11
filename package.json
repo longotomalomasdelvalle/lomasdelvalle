@@ -5,9 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:client": "vite",
+    "dev:server": "node --env-file=.env server/index.js",
+    "admin:hash": "node server/scripts/hash-password.js",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node tests/run-tests.js"
   },
   "dependencies": {
     "react": "^19.2.4",
