@@ -1,56 +1,83 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 const DURACION_SESION_SEGUNDOS = 60 * 60 * 8;
-const sesiones = new Map();
+const SESSION_SECRET =
+  process.env.SESSION_SECRET ||
+  process.env.ADMIN_PASSWORD_HASH ||
+  process.env.ADMIN_PASSWORD ||
+  'dev-session-secret-change-me';
 
-function limpiarSesionesExpiradas() {
-  const ahora = Date.now();
+function base64urlEncode(value) {
+  return Buffer.from(value, 'utf8').toString('base64url');
+}
 
-  for (const [token, sesion] of sesiones.entries()) {
-    if (sesion.expiraEn <= ahora) {
-      sesiones.delete(token);
+function base64urlDecode(value) {
+  return Buffer.from(value, 'base64url').toString('utf8');
+}
+
+function firmarPayload(payloadCodificado) {
+  return createHmac('sha256', SESSION_SECRET).update(payloadCodificado).digest('base64url');
+}
+
+function crearToken(payload) {
+  const payloadCodificado = base64urlEncode(JSON.stringify(payload));
+  const firma = firmarPayload(payloadCodificado);
+  return `${payloadCodificado}.${firma}`;
+}
+
+function verificarToken(token) {
+  if (!token || !token.includes('.')) {
+    return null;
+  }
+
+  const [payloadCodificado, firmaRecibida] = token.split('.', 2);
+
+  if (!payloadCodificado || !firmaRecibida) {
+    return null;
+  }
+
+  const firmaEsperada = firmarPayload(payloadCodificado);
+  const firmaEsperadaBuffer = Buffer.from(firmaEsperada);
+  const firmaRecibidaBuffer = Buffer.from(firmaRecibida);
+
+  if (firmaEsperadaBuffer.length !== firmaRecibidaBuffer.length) {
+    return null;
+  }
+
+  if (!timingSafeEqual(firmaEsperadaBuffer, firmaRecibidaBuffer)) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(base64urlDecode(payloadCodificado));
+
+    if (!payload?.expiraEn || Number(payload.expiraEn) <= Date.now()) {
+      return null;
     }
+
+    return payload;
+  } catch {
+    return null;
   }
 }
 
 export function crearSesion(datos) {
-  limpiarSesionesExpiradas();
-
-  const token = randomUUID();
   const expiraEn = Date.now() + DURACION_SESION_SEGUNDOS * 1000;
-
-  sesiones.set(token, {
+  const payload = {
     ...datos,
     expiraEn
-  });
+  };
 
   return {
-    token,
+    token: crearToken(payload),
     maxAge: DURACION_SESION_SEGUNDOS
   };
 }
 
 export function obtenerSesion(token) {
-  limpiarSesionesExpiradas();
-
-  if (!token) {
-    return null;
-  }
-
-  const sesion = sesiones.get(token);
-
-  if (!sesion) {
-    return null;
-  }
-
-  if (sesion.expiraEn <= Date.now()) {
-    sesiones.delete(token);
-    return null;
-  }
-
-  return sesion;
+  return verificarToken(token);
 }
 
 export function eliminarSesion(token) {
-  sesiones.delete(token);
+  return Boolean(token);
 }

@@ -1,9 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { escribirJsonBlob, leerJsonBlob, usaBlob } from './blob-store.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'server/data');
 const CONFIG_FILE = path.join(DATA_DIR, 'configuracion-columnas.json');
+const CONFIG_BLOB_PATH = 'lomas/configuracion-columnas.json';
 const CONFIGURACION_POR_DEFECTO = {
   cuotasExtra: ['CORTA FUEGO'],
   camposTransversales: []
@@ -43,6 +45,17 @@ async function escribirConfiguracion(configuracion) {
 }
 
 export async function cargarConfiguracionColumnas() {
+  if (usaBlob()) {
+    const configBlob = await leerJsonBlob(CONFIG_BLOB_PATH);
+
+    if (!configBlob) {
+      await escribirJsonBlob(CONFIG_BLOB_PATH, CONFIGURACION_POR_DEFECTO);
+      return { ...CONFIGURACION_POR_DEFECTO };
+    }
+
+    return normalizarConfiguracion(configBlob);
+  }
+
   await asegurarDirectorio();
 
   if (!existsSync(CONFIG_FILE)) {
@@ -61,6 +74,12 @@ export async function cargarConfiguracionColumnas() {
 
 export async function guardarConfiguracionColumnas(configuracion) {
   const normalizada = normalizarConfiguracion(configuracion);
+
+  if (usaBlob()) {
+    await escribirJsonBlob(CONFIG_BLOB_PATH, normalizada);
+    return normalizada;
+  }
+
   await escribirConfiguracion(normalizada);
   return normalizada;
 }

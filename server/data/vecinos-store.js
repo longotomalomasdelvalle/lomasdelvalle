@@ -3,9 +3,11 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import * as XLSX from 'xlsx';
 import { CAMPOS_CORTA_FUEGO, TODOS_LOS_MESES } from '../../src/constants/pagos.js';
+import { escribirJsonBlob, leerJsonBlob, usaBlob } from './blob-store.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'server/data');
 const DATA_FILE = path.join(DATA_DIR, 'vecinos.json');
+const DATA_BLOB_PATH = 'lomas/vecinos.json';
 const BACKUP_EXCEL_FILE = path.join(DATA_DIR, 'vecinos-respaldo.xlsx');
 const EXCEL_FILE = path.resolve(process.cwd(), 'public/PLANILLA GASTOS COMUNES.xlsx');
 const CAMPOS_CONTACTO_ALTERNATIVOS = [
@@ -126,7 +128,23 @@ async function escribirFilas(filas) {
   await writeFile(EXCEL_FILE, excelBuffer);
 }
 
+async function escribirFilasBlob(filas) {
+  await escribirJsonBlob(DATA_BLOB_PATH, filas);
+}
+
 export async function cargarFilasVecinos() {
+  if (usaBlob()) {
+    const filasBlob = await leerJsonBlob(DATA_BLOB_PATH);
+
+    if (!filasBlob) {
+      const filasExcel = await leerExcelInicial();
+      await escribirFilasBlob(filasExcel);
+      return filasExcel;
+    }
+
+    return limpiarFilasResumen(filasBlob);
+  }
+
   await asegurarDirectorio();
 
   if (!existsSync(DATA_FILE)) {
@@ -146,6 +164,12 @@ export async function cargarFilasVecinos() {
 
 export async function guardarFilasVecinos(filas) {
   const filasNormalizadas = limpiarFilasResumen(filas);
+
+  if (usaBlob()) {
+    await escribirFilasBlob(filasNormalizadas);
+    return filasNormalizadas;
+  }
+
   await escribirFilas(filasNormalizadas);
   return filasNormalizadas;
 }

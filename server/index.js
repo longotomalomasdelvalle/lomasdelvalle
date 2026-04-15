@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
-import { URL } from 'node:url';
+import { URL, fileURLToPath } from 'node:url';
+import path from 'node:path';
 import {
   credencialesAdminConfiguradas,
   validarCredencialesAdmin
@@ -68,8 +69,9 @@ function responderNoAutorizado(response) {
   });
 }
 
-const server = createServer(async (request, response) => {
-  const url = new URL(request.url || '/', `http://${request.headers.host}`);
+export async function handleRequest(request, response) {
+  const host = request.headers.host || 'localhost';
+  const url = new URL(request.url || '/', `http://${host}`);
 
   if (request.method === 'GET' && url.pathname === '/api/health') {
     responderJson(response, 200, { ok: true });
@@ -329,8 +331,17 @@ const server = createServer(async (request, response) => {
     ok: false,
     message: 'Ruta no encontrada.'
   });
-});
+}
 
-server.listen(PORT, () => {
-  console.log(`Servidor admin escuchando en http://localhost:${PORT}`);
-});
+function ejecutadoDirecto() {
+  const currentFile = fileURLToPath(import.meta.url);
+  const executedFile = process.argv[1] ? path.resolve(process.argv[1]) : '';
+  return currentFile === executedFile;
+}
+
+if (ejecutadoDirecto()) {
+  const server = createServer(handleRequest);
+  server.listen(PORT, () => {
+    console.log(`Servidor admin escuchando en http://localhost:${PORT}`);
+  });
+}
