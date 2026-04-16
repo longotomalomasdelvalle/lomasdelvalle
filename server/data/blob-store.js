@@ -55,6 +55,7 @@ export async function escribirJsonBlob(pathname, data) {
   await put(pathname, JSON.stringify(data, null, 2), {
     access: accesoBlob(),
     addRandomSuffix: false,
+    allowOverwrite: true,
     contentType: 'application/json'
   });
 
