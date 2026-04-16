@@ -116,6 +116,24 @@ async function leerExcelInicial() {
   return limpiarFilasResumen(XLSX.utils.sheet_to_json(worksheet));
 }
 
+async function leerDatosInicialesFallback() {
+  try {
+    return await leerExcelInicial();
+  } catch {
+    if (existsSync(DATA_FILE)) {
+      const contenido = await readFile(DATA_FILE, 'utf8');
+
+      if (!contenido.trim()) {
+        return [];
+      }
+
+      return limpiarFilasResumen(JSON.parse(contenido));
+    }
+
+    return [];
+  }
+}
+
 async function escribirFilas(filas) {
   await asegurarDirectorio();
   await writeFile(DATA_FILE, JSON.stringify(filas, null, 2), 'utf8');
@@ -137,9 +155,9 @@ export async function cargarFilasVecinos() {
     const filasBlob = await leerJsonBlob(DATA_BLOB_PATH);
 
     if (!filasBlob) {
-      const filasExcel = await leerExcelInicial();
-      await escribirFilasBlob(filasExcel);
-      return filasExcel;
+      const filasIniciales = await leerDatosInicialesFallback();
+      await escribirFilasBlob(filasIniciales);
+      return filasIniciales;
     }
 
     return limpiarFilasResumen(filasBlob);
