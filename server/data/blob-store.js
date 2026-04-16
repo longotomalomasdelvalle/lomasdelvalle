@@ -4,6 +4,10 @@ function blobHabilitado() {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
+function accesoBlob() {
+  return process.env.BLOB_ACCESS === 'public' ? 'public' : 'private';
+}
+
 async function buscarBlob(pathname) {
   const resultado = await list({
     prefix: pathname,
@@ -49,7 +53,7 @@ export async function escribirJsonBlob(pathname, data) {
   }
 
   await put(pathname, JSON.stringify(data, null, 2), {
-    access: 'public',
+    access: accesoBlob(),
     addRandomSuffix: false,
     contentType: 'application/json'
   });
