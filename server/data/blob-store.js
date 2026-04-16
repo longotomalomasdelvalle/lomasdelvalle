@@ -8,6 +8,10 @@ function accesoBlob() {
   return process.env.BLOB_ACCESS === 'public' ? 'public' : 'private';
 }
 
+function accesoAlternativo(access) {
+  return access === 'public' ? 'private' : 'public';
+}
+
 async function buscarBlob(pathname) {
   const resultado = await list({
     prefix: pathname,
@@ -52,11 +56,32 @@ export async function escribirJsonBlob(pathname, data) {
     return false;
   }
 
-  await put(pathname, JSON.stringify(data, null, 2), {
-    access: accesoBlob(),
-    addRandomSuffix: false,
-    contentType: 'application/json'
-  });
+  const body = JSON.stringify(data, null, 2);
+  const access = accesoBlob();
+
+  try {
+    await put(pathname, body, {
+      access,
+      addRandomSuffix: false,
+      contentType: 'application/json'
+    });
+  } catch (error) {
+    const message = String(error?.message || '');
+
+    if (
+      message.includes('access must be "public"') ||
+      message.includes('acceso público en un almacén privado') ||
+      message.includes('configurado con acceso privado')
+    ) {
+      await put(pathname, body, {
+        access: accesoAlternativo(access),
+        addRandomSuffix: false,
+        contentType: 'application/json'
+      });
+    } else {
+      throw error;
+    }
+  }
 
   return true;
 }
