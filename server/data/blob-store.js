@@ -57,33 +57,25 @@ export async function escribirJsonBlob(pathname, data) {
   }
 
   const body = JSON.stringify(data, null, 2);
-  const access = accesoBlob();
+  const preferido = accesoBlob();
+  const candidatos = [preferido, accesoAlternativo(preferido)];
+  let ultimoError = null;
 
-  try {
-    await put(pathname, body, {
-      access,
-      addRandomSuffix: false,
-      contentType: 'application/json'
-    });
-  } catch (error) {
-    const message = String(error?.message || '');
-
-    if (
-      message.includes('access must be "public"') ||
-      message.includes('acceso público en un almacén privado') ||
-      message.includes('configurado con acceso privado')
-    ) {
+  for (const access of candidatos) {
+    try {
       await put(pathname, body, {
-        access: accesoAlternativo(access),
+        access,
         addRandomSuffix: false,
         contentType: 'application/json'
       });
-    } else {
-      throw error;
+
+      return true;
+    } catch (error) {
+      ultimoError = error;
     }
   }
 
-  return true;
+  throw ultimoError || new Error('No se pudo escribir en Vercel Blob.');
 }
 
 export function usaBlob() {
