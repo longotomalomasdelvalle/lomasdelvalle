@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import EstadoCarga from './components/EstadoCarga';
 import AdminVecinosGrid from './components/AdminVecinosGrid';
 import EstadisticasAdmin from './components/EstadisticasAdmin';
@@ -47,6 +47,23 @@ function IconoInicio() {
   );
 }
 
+function IconoTemaClaro() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+      <circle cx="10" cy="10" r="3.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10 2.5V4.5M10 15.5V17.5M2.5 10H4.5M15.5 10H17.5M4.7 4.7L6.1 6.1M13.9 13.9L15.3 15.3M13.9 6.1L15.3 4.7M4.7 15.3L6.1 13.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconoTemaOscuro() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path d="M11.4 2.8C8.5 3.5 6.3 6.1 6.3 9.2C6.3 12.8 9.2 15.7 12.8 15.7C14.8 15.7 16.6 14.8 17.8 13.3C17 16.3 14.2 18.5 10.9 18.5C7 18.5 3.8 15.3 3.8 11.4C3.8 8.1 6 5.3 9 4.5C9.8 4.3 10.6 4.1 11.4 2.8Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function PortalPagosPasaje() {
   const [filtroParcela, setFiltroParcela] = useState('');
   const [filtroSitio, setFiltroSitio] = useState('');
@@ -54,6 +71,7 @@ export default function PortalPagosPasaje() {
   const [mostrarLogin, setMostrarLogin] = useState(false);
   const [usuarioAdmin, setUsuarioAdmin] = useState('');
   const [claveAdmin, setClaveAdmin] = useState('');
+  const [tema, setTema] = useState(() => localStorage.getItem('tema_lomas') || 'claro');
   const {
     logueado,
     cargandoSesion,
@@ -83,6 +101,12 @@ export default function PortalPagosPasaje() {
     exportarJson
   } = useAdminVecinos(logueado, recargar);
 
+  useEffect(() => {
+    const esOscuro = tema === 'oscuro';
+    document.documentElement.classList.toggle('theme-dark', esOscuro);
+    localStorage.setItem('tema_lomas', tema);
+  }, [tema]);
+
   async function iniciarSesionAdmin() {
     const ok = await iniciarSesion(usuarioAdmin, claveAdmin);
 
@@ -111,14 +135,21 @@ export default function PortalPagosPasaje() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 p-3 md:p-6">
+    <div className="min-h-screen bg-slate-100 p-3 md:p-6 theme-transition">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="bg-white rounded-3xl shadow-xl p-4 md:p-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 md:gap-6">
+        <div className="bg-white rounded-2xl shadow-lg p-4 md:p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 md:gap-4">
           <div className="flex items-center justify-end gap-2 lg:order-3 lg:self-start">
+            <button
+              onClick={() => setTema((actual) => (actual === 'oscuro' ? 'claro' : 'oscuro'))}
+              className="inline-flex items-center justify-center bg-slate-100 text-slate-700 h-10 w-10 rounded-xl hover:bg-slate-200 transition"
+              title={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            >
+              {tema === 'oscuro' ? <IconoTemaClaro /> : <IconoTemaOscuro />}
+            </button>
             {!logueado ? (
               <button
                 onClick={volverAlInicio}
-                className="inline-flex items-center justify-center bg-slate-100 text-slate-700 h-11 w-11 rounded-2xl hover:bg-slate-200 transition shadow-sm"
+                className="inline-flex items-center justify-center bg-slate-100 text-slate-700 h-10 w-10 rounded-xl hover:bg-slate-200 transition"
                 title="Volver al inicio"
               >
                 <IconoInicio />
@@ -131,7 +162,7 @@ export default function PortalPagosPasaje() {
                 </div>
                 <button
                   onClick={cerrarSesion}
-                  className="bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-sm font-medium hover:bg-slate-700 transition whitespace-nowrap"
+                  className="bg-slate-900 text-white px-3.5 py-2 rounded-xl text-sm font-medium hover:bg-slate-700 transition whitespace-nowrap"
                 >
                   Cerrar sesion
                 </button>
@@ -140,7 +171,7 @@ export default function PortalPagosPasaje() {
               <button
                 onClick={() => setMostrarLogin((valorActual) => !valorActual)}
                 disabled={cargandoSesion}
-                className="inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-2xl font-medium hover:bg-slate-700 transition whitespace-nowrap shadow-sm"
+                className="inline-flex items-center gap-2 bg-slate-900 text-white px-3.5 py-2 rounded-xl text-sm font-medium hover:bg-slate-700 transition whitespace-nowrap"
               >
                 <IconoAdministrador />
                 {cargandoSesion ? 'Verificando...' : 'Iniciar sesion'}
@@ -151,26 +182,26 @@ export default function PortalPagosPasaje() {
           <div className="flex items-center gap-3 md:gap-4 lg:flex-1">
             <button
               onClick={volverAlInicio}
-              className="shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-300"
+              className="shrink-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300"
               title="Ir al inicio"
             >
               <img
                 src="/logo-lomas-del-valle.jpg"
                 alt="Logo de Lomas del Valle"
-                className="w-16 h-16 md:w-24 md:h-24 object-contain rounded-2xl bg-white p-2 shadow"
+                className="w-14 h-14 md:w-16 md:h-16 object-contain rounded-xl bg-white p-1.5 shadow"
               />
             </button>
 
             <div className="min-w-0">
-              <h1 className="text-xl md:text-4xl font-bold text-slate-900 leading-tight">
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 leading-tight">
                 {tituloCabecera}
               </h1>
               {logueado ? (
-                <p className="text-emerald-700 mt-2 text-xs md:text-sm font-medium">
+                <p className="text-emerald-700 mt-1.5 text-xs md:text-sm font-medium">
                   Sesion administradora activa: {resumenAdmin?.usuario || 'Administrador'}
                 </p>
               ) : (
-                <p className="text-slate-500 mt-2 text-sm md:text-base">
+                <p className="text-slate-500 mt-1.5 text-sm">
                   Consulta tu estado de pago por nombre, parcela o sitio.
                 </p>
               )}

@@ -11,6 +11,9 @@ const INDICE_MES = TODOS_LOS_MESES.reduce((mapa, mes, index) => {
   mapa[mes] = index;
   return mapa;
 }, {});
+const ALIAS_MESES = {
+  MAYO: ['MAYONESA', 'MAY0']
+};
 
 export function obtenerValorCampo(fila, campos = []) {
   return campos
@@ -95,10 +98,10 @@ export function obtenerCuotasExtra(fila, configuracion = CONFIGURACION_COLUMNAS_
 
 export function obtenerMesesPagados(fila) {
   return TODOS_LOS_MESES.filter((mes) => {
-    const valor = fila[mes];
+    const valor = obtenerValorCampo(fila, [mes, ...(ALIAS_MESES[mes] || [])]);
     return valor && String(valor).trim() !== '';
   }).map((mes) => {
-    const monto = limpiarNumero(fila[mes]);
+    const monto = limpiarNumero(obtenerValorCampo(fila, [mes, ...(ALIAS_MESES[mes] || [])]));
     const montoEsperado = VALOR_MES[mes] || 0;
 
     return {

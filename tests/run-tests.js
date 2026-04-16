@@ -84,6 +84,20 @@ runTest('crearVecino calcula totales y solo suma cuotas extra configuradas', () 
   assert.ok(vecino.mesesPendientes.some((item) => item.mes === 'MARZO'));
 });
 
+runTest('crearVecino normaliza alias MAYONESA como MAYO', () => {
+  const vecino = crearVecino(
+    {
+      'NOMBRE DE PROPIETARIO': 'Vecino Test',
+      MAYONESA: '$8.000'
+    },
+    0,
+    { cuotasExtra: ['CORTA FUEGO'], camposTransversales: [] }
+  );
+
+  assert.ok(vecino.mesesPagados.some((item) => item.mes === 'MAYO'));
+  assert.ok(!vecino.mesesPagados.some((item) => item.mes === 'MAYONESA'));
+});
+
 runTest('normalizarConfiguracionColumnas manda columnas desconocidas a campos transversales', () => {
   const configuracion = normalizarConfiguracionColumnas(
     { cuotasExtra: ['CORTA FUEGO'] },
