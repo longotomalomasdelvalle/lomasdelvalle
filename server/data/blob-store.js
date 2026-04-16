@@ -8,6 +8,10 @@ function accesoBlob() {
   return process.env.BLOB_ACCESS === 'public' ? 'public' : 'private';
 }
 
+function accessAlternativo(access) {
+  return access === 'private' ? 'public' : 'private';
+}
+
 async function buscarBlob(pathname) {
   const resultado = await list({
     prefix: pathname,
@@ -52,13 +56,26 @@ export async function escribirJsonBlob(pathname, data) {
     return false;
   }
 
-  await put(pathname, JSON.stringify(data, null, 2), {
-    access: accesoBlob(),
-    addRandomSuffix: false,
-    contentType: 'application/json'
-  });
+  const body = JSON.stringify(data, null, 2);
+  const preferido = accesoBlob();
+  const candidatos = [preferido, accessAlternativo(preferido)];
+  let ultimoError = null;
 
-  return true;
+  for (const access of candidatos) {
+    try {
+      await put(pathname, body, {
+        access,
+        addRandomSuffix: false,
+        contentType: 'application/json'
+      });
+      return true;
+    } catch (error) {
+      ultimoError = error;
+    }
+  }
+
+  throw ultimoError || new Error('No se pudo escribir en Vercel Blob.');
+
 }
 
 export function usaBlob() {
