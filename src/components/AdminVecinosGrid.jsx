@@ -13,10 +13,6 @@ import { normalizarTexto } from '../utils/pagos.js';
 
 const FILAS_POR_PAGINA = 10;
 
-function esEstadoActivo(estado) {
-  return estado === 'Pagado' || estado === 'Activo';
-}
-
 function esCampoMonetario(columna, columnasCuotaExtra) {
   return TODOS_LOS_MESES.includes(columna) || columnasCuotaExtra.includes(columna);
 }
@@ -271,26 +267,6 @@ function MobileField({
   columnasCuotaExtra,
   onChangeCell
 }) {
-  if (columna === 'ESTADO') {
-    return (
-      <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2">
-        <span className="text-[11px] font-semibold tracking-wide text-slate-600">ESTADO</span>
-        <label className="flex items-center gap-2 text-xs text-slate-700">
-          <input
-            type="checkbox"
-            checked={esEstadoActivo(fila.ESTADO)}
-            disabled={guardando || !editable}
-            onChange={(event) =>
-              onChangeCell(index, 'ESTADO', event.target.checked ? 'Pagado' : 'Pendiente')
-            }
-            className="h-4 w-4"
-          />
-          {esEstadoActivo(fila.ESTADO) ? 'Activo' : 'Pendiente'}
-        </label>
-      </div>
-    );
-  }
-
   const esNumerico =
     columna === 'PARCELA' ||
     columna === 'SITIO' ||
@@ -504,8 +480,7 @@ export default function AdminVecinosGrid({
       'RUT',
       'N-CONTACTO',
       'F/FIRMA',
-      'OBSERVACION',
-      'ESTADO'
+      'OBSERVACION'
     ],
     []
   );
@@ -826,28 +801,6 @@ export default function AdminVecinosGrid({
                     </div>
                   </td>
                   {columnas.map((columna) => {
-                    if (columna === 'ESTADO') {
-                      return (
-                        <td key={`${index}-${columna}`} className="px-2 py-1.5 align-top">
-                          <label className="flex items-center justify-center min-h-9 min-w-16">
-                            <input
-                              type="checkbox"
-                              checked={esEstadoActivo(fila.ESTADO)}
-                              disabled={guardando || filaSeleccionada !== index}
-                              onChange={(event) =>
-                                onChangeCell(
-                                  index,
-                                  'ESTADO',
-                                  event.target.checked ? 'Pagado' : 'Pendiente'
-                                )
-                              }
-                              className="h-5 w-5"
-                            />
-                          </label>
-                        </td>
-                      );
-                    }
-
                     const esMonto = esCampoMonetario(columna, columnasCuotaExtra);
                     const validacion = obtenerEstadoValidacion(columna, fila[columna]);
                     const anchoInput =

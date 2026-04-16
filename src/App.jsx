@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import EstadoCarga from './components/EstadoCarga';
+import AdminAnalytics from './components/AdminAnalytics';
 import AdminVecinosGrid from './components/AdminVecinosGrid';
 import EstadisticasAdmin from './components/EstadisticasAdmin';
 import FiltrosBusqueda from './components/FiltrosBusqueda';
@@ -71,6 +72,7 @@ export default function PortalPagosPasaje() {
   const [mostrarLogin, setMostrarLogin] = useState(false);
   const [usuarioAdmin, setUsuarioAdmin] = useState('');
   const [claveAdmin, setClaveAdmin] = useState('');
+  const [adminVista, setAdminVista] = useState('dashboard');
   const [tema, setTema] = useState(() => localStorage.getItem('tema_lomas') || 'claro');
   const {
     logueado,
@@ -111,6 +113,7 @@ export default function PortalPagosPasaje() {
     const ok = await iniciarSesion(usuarioAdmin, claveAdmin);
 
     if (ok) {
+      setAdminVista('dashboard');
       setMostrarLogin(false);
       setUsuarioAdmin('');
       setClaveAdmin('');
@@ -211,25 +214,69 @@ export default function PortalPagosPasaje() {
 
         {logueado ? (
           <div className="space-y-6">
-            <EstadisticasAdmin filas={filas} configuracion={configuracion} />
-            <AdminVecinosGrid
-              filas={filas}
-              configuracion={configuracion}
-              cargando={cargandoAdminVecinos}
-              guardando={guardandoAdminVecinos}
-              mensaje={mensajeAdminVecinos}
-              error={errorAdminVecinos}
-              onChangeCell={actualizarCelda}
-              onDeleteConfiguredColumn={eliminarColumnaConfigurada}
-              onAddRow={agregarFila}
-              onDeleteRow={eliminarFila}
-              onReplaceRow={reemplazarFila}
-              onSave={guardarFilas}
-              onNormalize={normalizarPlanilla}
-              onImportExcel={importarExcel}
-              onExportExcel={exportarExcel}
-              onExportJson={exportarJson}
-            />
+            <div className="rounded-2xl bg-white border border-slate-200 p-2 shadow-sm">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setAdminVista('dashboard')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                    adminVista === 'dashboard'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => setAdminVista('planilla')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                    adminVista === 'planilla'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Planilla
+                </button>
+                <button
+                  onClick={() => setAdminVista('analitica')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                    adminVista === 'analitica'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Analitica
+                </button>
+              </div>
+            </div>
+
+            {adminVista === 'dashboard' ? (
+              <EstadisticasAdmin filas={filas} configuracion={configuracion} />
+            ) : null}
+
+            {adminVista === 'planilla' ? (
+              <AdminVecinosGrid
+                filas={filas}
+                configuracion={configuracion}
+                cargando={cargandoAdminVecinos}
+                guardando={guardandoAdminVecinos}
+                mensaje={mensajeAdminVecinos}
+                error={errorAdminVecinos}
+                onChangeCell={actualizarCelda}
+                onDeleteConfiguredColumn={eliminarColumnaConfigurada}
+                onAddRow={agregarFila}
+                onDeleteRow={eliminarFila}
+                onReplaceRow={reemplazarFila}
+                onSave={guardarFilas}
+                onNormalize={normalizarPlanilla}
+                onImportExcel={importarExcel}
+                onExportExcel={exportarExcel}
+                onExportJson={exportarJson}
+              />
+            ) : null}
+
+            {adminVista === 'analitica' ? (
+              <AdminAnalytics filas={filas} configuracion={configuracion} />
+            ) : null}
           </div>
         ) : null}
 
