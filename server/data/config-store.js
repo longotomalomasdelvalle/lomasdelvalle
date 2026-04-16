@@ -11,6 +11,10 @@ const CONFIGURACION_POR_DEFECTO = {
   camposTransversales: []
 };
 
+function esErrorSoloLectura(error) {
+  return ['EROFS', 'EPERM', 'EACCES'].includes(error?.code);
+}
+
 function limpiarColumna(valor) {
   return String(valor ?? '').trim().replace(/\s+/g, ' ').toUpperCase();
 }
@@ -59,7 +63,11 @@ export async function cargarConfiguracionColumnas() {
   await asegurarDirectorio();
 
   if (!existsSync(CONFIG_FILE)) {
-    await escribirConfiguracion(CONFIGURACION_POR_DEFECTO);
+    try {
+      await escribirConfiguracion(CONFIGURACION_POR_DEFECTO);
+    } catch {
+      return { ...CONFIGURACION_POR_DEFECTO };
+    }
     return { ...CONFIGURACION_POR_DEFECTO };
   }
 
@@ -80,6 +88,16 @@ export async function guardarConfiguracionColumnas(configuracion) {
     return normalizada;
   }
 
-  await escribirConfiguracion(normalizada);
+  try {
+    await escribirConfiguracion(normalizada);
+  } catch (error) {
+    if (esErrorSoloLectura(error)) {
+      throw new Error(
+        'No se puede guardar en disco en Vercel. Configura BLOB_READ_WRITE_TOKEN (y BLOB_ACCESS=private) en Variables de entorno.'
+      );
+    }
+
+    throw error;
+  }
   return normalizada;
 }

@@ -4,6 +4,10 @@ function blobHabilitado() {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
+function accesoBlob() {
+  return process.env.BLOB_ACCESS === 'public' ? 'public' : 'private';
+}
+
 async function buscarBlob(pathname) {
   const resultado = await list({
     prefix: pathname,
@@ -29,7 +33,12 @@ export async function leerJsonBlob(pathname) {
     return null;
   }
 
-  const response = await fetch(blob.url, { cache: 'no-store' });
+  const response = await fetch(blob.url, {
+    cache: 'no-store',
+    headers: {
+      Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
+    }
+  });
 
   if (!response.ok) {
     throw new Error(`No se pudo leer blob ${pathname}: ${response.status}`);
@@ -44,7 +53,7 @@ export async function escribirJsonBlob(pathname, data) {
   }
 
   await put(pathname, JSON.stringify(data, null, 2), {
-    access: 'public',
+    access: accesoBlob(),
     addRandomSuffix: false,
     contentType: 'application/json'
   });

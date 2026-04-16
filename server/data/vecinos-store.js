@@ -27,6 +27,10 @@ const ALIAS_A_CANONICOS = {
   OBSERVACIONES: 'OBSERVACION'
 };
 
+function esErrorSoloLectura(error) {
+  return ['EROFS', 'EPERM', 'EACCES'].includes(error?.code);
+}
+
 CAMPOS_CONTACTO_ALTERNATIVOS.forEach((alias) => {
   ALIAS_A_CANONICOS[alias] = 'N-CONTACTO';
 });
@@ -166,8 +170,12 @@ export async function cargarFilasVecinos() {
   await asegurarDirectorio();
 
   if (!existsSync(DATA_FILE)) {
-    const filasExcel = await leerExcelInicial();
-    await escribirFilas(filasExcel);
+    const filasExcel = await leerDatosInicialesFallback();
+    try {
+      await escribirFilas(filasExcel);
+    } catch {
+      return filasExcel;
+    }
     return filasExcel;
   }
 
@@ -188,6 +196,16 @@ export async function guardarFilasVecinos(filas) {
     return filasNormalizadas;
   }
 
-  await escribirFilas(filasNormalizadas);
+  try {
+    await escribirFilas(filasNormalizadas);
+  } catch (error) {
+    if (esErrorSoloLectura(error)) {
+      throw new Error(
+        'No se puede guardar en disco en Vercel. Configura BLOB_READ_WRITE_TOKEN (y BLOB_ACCESS=private) en Variables de entorno.'
+      );
+    }
+
+    throw error;
+  }
   return filasNormalizadas;
 }

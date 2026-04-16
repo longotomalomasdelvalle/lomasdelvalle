@@ -70,13 +70,14 @@ function responderNoAutorizado(response) {
 }
 
 export async function handleRequest(request, response) {
-  const host = request.headers.host || 'localhost';
-  const url = new URL(request.url || '/', `http://${host}`);
+  try {
+    const host = request.headers.host || 'localhost';
+    const url = new URL(request.url || '/', `http://${host}`);
 
-  if (request.method === 'GET' && url.pathname === '/api/health') {
-    responderJson(response, 200, { ok: true });
-    return;
-  }
+    if (request.method === 'GET' && url.pathname === '/api/health') {
+      responderJson(response, 200, { ok: true });
+      return;
+    }
 
   if (request.method === 'GET' && url.pathname === '/api/vecinos') {
     const [filas, configuracion] = await Promise.all([
@@ -327,10 +328,16 @@ export async function handleRequest(request, response) {
     return;
   }
 
-  responderJson(response, 404, {
-    ok: false,
-    message: 'Ruta no encontrada.'
-  });
+    responderJson(response, 404, {
+      ok: false,
+      message: 'Ruta no encontrada.'
+    });
+  } catch (error) {
+    responderJson(response, 500, {
+      ok: false,
+      message: error?.message || 'Error interno del servidor.'
+    });
+  }
 }
 
 function ejecutadoDirecto() {
