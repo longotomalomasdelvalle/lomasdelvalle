@@ -1,4 +1,28 @@
-import { formatearFechaVisible } from '../utils/adminRows.js';
+function IconoMoneda() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+      <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10 6.5V13.5M7.75 8.5H11.25C12.0784 8.5 12.75 9.17157 12.75 10C12.75 10.8284 12.0784 11.5 11.25 11.5H8.75C7.92157 11.5 7.25 12.1716 7.25 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconoCalendario() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+      <rect x="3.5" y="4.5" width="13" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M6.5 3.5V6M13.5 3.5V6M3.5 8H16.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconoEstado() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path d="M4.5 10L8 13.5L15.5 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 export default function TarjetaVecino({ vecino }) {
   const totalCuotasExtra = vecino.cuotasExtra.reduce((total, item) => total + item.montoPagado, 0);
@@ -18,19 +42,9 @@ export default function TarjetaVecino({ vecino }) {
             Parcela: {vecino.parcela} | Sitio: {vecino.sitio}
           </p>
           <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
-            {vecino.rut ? (
-              <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
-                RUT: {vecino.rut}
-              </span>
-            ) : null}
             {vecino.contacto ? (
               <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
                 Contacto: {vecino.contacto}
-              </span>
-            ) : null}
-            {vecino.fechaFirma ? (
-              <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
-                Firma: {formatearFechaVisible(vecino.fechaFirma)}
               </span>
             ) : null}
           </div>
@@ -43,13 +57,19 @@ export default function TarjetaVecino({ vecino }) {
               : 'bg-red-100 text-red-700'
           }`}
         >
-          {vecino.estado}
+          <span className="inline-flex items-center gap-1">
+            <IconoEstado />
+            {vecino.estado}
+          </span>
         </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="rounded-xl p-3 border border-slate-200 bg-slate-50">
-          <p className="text-xs text-slate-500">Total pagado</p>
+          <p className="text-xs text-slate-500 inline-flex items-center gap-1">
+            <IconoMoneda />
+            Total pagado
+          </p>
           <p className="text-xl md:text-2xl font-semibold text-emerald-700 mt-1 break-words">
             ${vecino.totalPagado.toLocaleString('es-CL')}
           </p>
@@ -60,7 +80,10 @@ export default function TarjetaVecino({ vecino }) {
         </div>
 
         <div className="rounded-xl p-3 border border-slate-200 bg-slate-50">
-          <p className="text-xs text-slate-500">Total pendiente</p>
+          <p className="text-xs text-slate-500 inline-flex items-center gap-1">
+            <IconoMoneda />
+            Total pendiente
+          </p>
           <p className="text-xl md:text-2xl font-semibold text-red-600 mt-1 break-words">
             ${vecino.totalPendiente.toLocaleString('es-CL')}
           </p>
@@ -71,7 +94,10 @@ export default function TarjetaVecino({ vecino }) {
         </div>
 
         <div className="rounded-xl p-3 border border-slate-200 bg-slate-50">
-          <p className="text-xs text-slate-500">Cuotas extra</p>
+          <p className="text-xs text-slate-500 inline-flex items-center gap-1">
+            <IconoMoneda />
+            Cuotas extra
+          </p>
           <p className="text-xl md:text-2xl font-semibold text-amber-700 mt-1 break-words">
             ${totalCuotasExtra.toLocaleString('es-CL')}
           </p>
@@ -83,12 +109,18 @@ export default function TarjetaVecino({ vecino }) {
         <div className="rounded-xl p-3 border border-slate-200 md:col-span-3">
           {vecino.observaciones ? (
             <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs text-slate-500">Observaciones</p>
+              <p className="text-xs text-slate-500 inline-flex items-center gap-1">
+                <IconoCalendario />
+                Observaciones
+              </p>
               <p className="mt-1 text-sm text-slate-800">{vecino.observaciones}</p>
             </div>
           ) : null}
 
-          <p className="text-xs text-slate-500 mb-2">Meses pagados</p>
+          <p className="text-xs text-slate-500 mb-2 inline-flex items-center gap-1">
+            <IconoCalendario />
+            Meses pagados
+          </p>
 
           <div className="flex flex-wrap gap-2">
             {vecino.mesesPagados.length > 0 ? (
@@ -145,7 +177,10 @@ export default function TarjetaVecino({ vecino }) {
             </div>
           </div>
 
-          <p className="text-xs text-slate-500 mt-4 mb-2">Meses pendientes</p>
+          <p className="text-xs text-slate-500 mt-4 mb-2 inline-flex items-center gap-1">
+            <IconoCalendario />
+            Meses pendientes
+          </p>
 
           <div className="flex flex-wrap gap-2">
             {vecino.mesesPendientes.length > 0 ? (
@@ -154,8 +189,8 @@ export default function TarjetaVecino({ vecino }) {
                   key={item.mes}
                   className="bg-red-100 text-red-700 px-2.5 py-1 rounded-full text-xs font-medium"
                 >
-                  {item.mes} - Faltan ${item.montoPendiente.toLocaleString('es-CL')}
-                  {item.incompleto ? ' (pago parcial)' : ''}
+                  {item.mes} - ${item.montoPendiente.toLocaleString('es-CL')}
+                  {item.incompleto ? ' parcial' : ''}
                 </span>
               ))
             ) : (

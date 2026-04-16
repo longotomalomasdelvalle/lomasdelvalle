@@ -7,6 +7,10 @@ import {
 } from './columnas.js';
 
 const VALOR_CORTA_FUEGO = 10000;
+const INDICE_MES = TODOS_LOS_MESES.reduce((mapa, mes, index) => {
+  mapa[mes] = index;
+  return mapa;
+}, {});
 
 export function obtenerValorCampo(fila, campos = []) {
   return campos
@@ -141,6 +145,11 @@ export function crearVecino(fila, index, configuracion = CONFIGURACION_COLUMNAS_
     (total, item) => total + item.montoPendiente,
     0
   );
+  const mesActualIndex = new Date().getMonth();
+  const tienePendientesHastaMesActual = mesesPendientes.some(
+    (item) => (INDICE_MES[item.mes] ?? 12) <= mesActualIndex
+  );
+  const estadoCalculado = tienePendientesHastaMesActual ? 'Pendiente' : 'Pagado';
 
   return {
     id: index + 1,
@@ -154,10 +163,11 @@ export function crearVecino(fila, index, configuracion = CONFIGURACION_COLUMNAS_
     observaciones: String(obtenerValorCampo(fila, ['OBSERVACION', 'OBSERVACIONES']) ?? '').trim(),
     parcela,
     sitio,
-    estado: fila.ESTADO || 'Pendiente',
+    estado: estadoCalculado,
+    estadoManual: fila.ESTADO || '',
     mesesPagados,
     mesesPendientes,
-    totalPagado: totalPagadoMeses,
+    totalPagado: totalPagadoMeses + totalPagadoCuotasExtra,
     totalPagadoMeses,
     totalPagadoCuotasExtra,
     totalPendiente: totalPendienteMeses + totalPendienteCuotasExtra,

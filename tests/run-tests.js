@@ -74,7 +74,7 @@ runTest('crearVecino calcula totales y solo suma cuotas extra configuradas', () 
   assert.equal(vecino.contacto, '987000111');
   assert.equal(vecino.fechaFirma, '24-11-2022');
   assert.equal(vecino.observaciones, 'Vecino con observacion');
-  assert.equal(vecino.totalPagado, 18000);
+  assert.equal(vecino.totalPagado, 21000);
   assert.equal(vecino.cuotasExtra.length, 1);
   assert.equal(vecino.cuotasExtra[0].montoPagado, 3000);
   assert.equal(vecino.cuotasExtra[0].montoPendiente, 7000);
