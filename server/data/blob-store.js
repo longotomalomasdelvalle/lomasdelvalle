@@ -49,7 +49,7 @@ export async function escribirJsonBlob(pathname, data) {
   }
 
   await put(pathname, JSON.stringify(data, null, 2), {
-    access: 'private',
+    access: 'public',
     addRandomSuffix: false,
     contentType: 'application/json'
   });
