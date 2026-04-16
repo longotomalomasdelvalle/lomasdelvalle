@@ -12,7 +12,9 @@ export default function useVecinos() {
       setCargando(true);
       setErrorCarga('');
 
-      const response = await fetch('/api/vecinos');
+      const response = await fetch(`/api/vecinos?t=${Date.now()}`, {
+        cache: 'no-store'
+      });
 
       if (!response.ok) {
         throw new Error('No se encontraron datos de vecinos.');
