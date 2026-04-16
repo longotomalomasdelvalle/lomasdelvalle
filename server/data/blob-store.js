@@ -4,8 +4,8 @@ function blobHabilitado() {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
-function accessAlternativo(access) {
-  return access === 'private' ? 'public' : 'private';
+function accesoBlob() {
+  return process.env.BLOB_ACCESS === 'public' ? 'public' : 'private';
 }
 
 async function buscarBlob(pathname) {
@@ -52,25 +52,13 @@ export async function escribirJsonBlob(pathname, data) {
     return false;
   }
 
-  const body = JSON.stringify(data, null, 2);
-  const preferido = 'private';
-  const candidatos = [preferido, accessAlternativo(preferido)];
-  const errores = [];
+  await put(pathname, JSON.stringify(data, null, 2), {
+    access: accesoBlob(),
+    addRandomSuffix: false,
+    contentType: 'application/json'
+  });
 
-  for (const access of candidatos) {
-    try {
-      await put(pathname, body, {
-        access,
-        addRandomSuffix: false,
-        contentType: 'application/json'
-      });
-      return true;
-    } catch (error) {
-      errores.push(`${access}: ${error?.message || 'error desconocido'}`);
-    }
-  }
-
-  throw new Error(`BLOB_WRITE_FAILED -> ${errores.join(' | ')}`);
+  return true;
 
 }
 
