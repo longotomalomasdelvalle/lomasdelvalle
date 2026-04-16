@@ -76,10 +76,12 @@ runTest('crearVecino calcula totales y solo suma cuotas extra configuradas', () 
   assert.equal(vecino.observaciones, 'Vecino con observacion');
   assert.equal(vecino.totalPagado, 18000);
   assert.equal(vecino.cuotasExtra.length, 1);
-  assert.equal(vecino.cuotasExtra[0].monto, 3000);
-  assert.equal(vecino.totalPendiente, 79000);
+  assert.equal(vecino.cuotasExtra[0].montoPagado, 3000);
+  assert.equal(vecino.cuotasExtra[0].montoPendiente, 7000);
+  assert.equal(vecino.totalPendiente, 83000);
   assert.equal(vecino.mesesPagados[1].incompleto, true);
-  assert.ok(vecino.mesesPendientes.includes('MARZO'));
+  assert.ok(vecino.mesesPendientes.some((item) => item.mes === 'FEBRERO'));
+  assert.ok(vecino.mesesPendientes.some((item) => item.mes === 'MARZO'));
 });
 
 runTest('normalizarConfiguracionColumnas manda columnas desconocidas a campos transversales', () => {

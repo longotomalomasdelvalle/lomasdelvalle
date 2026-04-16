@@ -7,7 +7,7 @@ export default function FiltrosBusqueda({
   setFiltroSitio
 }) {
   return (
-    <div className="grid md:grid-cols-3 gap-3 md:gap-4 mb-5 md:mb-6">
+    <div className="grid md:grid-cols-3 gap-3 md:gap-4 mb-5 md:mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:p-4">
       <div>
         <label className="block text-xs md:text-sm font-medium text-slate-700 mb-2" htmlFor="filtro-nombre">
           Buscar por nombre completo

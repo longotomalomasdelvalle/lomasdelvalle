@@ -6,6 +6,8 @@ import {
   normalizarNombreColumna
 } from './columnas.js';
 
+const VALOR_CORTA_FUEGO = 10000;
+
 export function obtenerValorCampo(fila, campos = []) {
   return campos
     .map((campo) => fila[campo])
@@ -68,12 +70,18 @@ export function obtenerCuotasExtra(fila, configuracion = CONFIGURACION_COLUMNAS_
       columna === COLUMNA_CUOTA_EXTRA_POR_DEFECTO
         ? obtenerValorCampo(fila, [COLUMNA_CUOTA_EXTRA_POR_DEFECTO, ...CAMPOS_CORTA_FUEGO])
         : fila[columna];
-    const monto = limpiarNumero(valor);
+    const montoPagado = limpiarNumero(valor);
+    const montoEsperado =
+      columna === COLUMNA_CUOTA_EXTRA_POR_DEFECTO ? VALOR_CORTA_FUEGO : montoPagado;
+    const montoPendiente = Math.max(montoEsperado - montoPagado, 0);
 
-    if (monto > 0) {
+    if (montoPagado > 0 || montoPendiente > 0) {
       extras.push({
         nombre: columna,
-        monto
+        montoPagado,
+        montoEsperado,
+        montoPendiente,
+        incompleta: montoPendiente > 0
       });
     }
   });
@@ -101,22 +109,38 @@ export function obtenerMesesPagados(fila) {
 export function crearVecino(fila, index, configuracion = CONFIGURACION_COLUMNAS_POR_DEFECTO) {
   const { parcela, sitio } = obtenerParcelaYSitio(fila);
   const mesesPagados = obtenerMesesPagados(fila);
-  const mesesPendientes = TODOS_LOS_MESES.filter(
-    (mes) => !mesesPagados.some((item) => item.mes === mes)
+  const mapaMesesPagados = new Map(mesesPagados.map((item) => [item.mes, item]));
+  const mesesPendientes = TODOS_LOS_MESES.map((mes) => {
+    const pago = mapaMesesPagados.get(mes);
+    const montoEsperado = VALOR_MES[mes] || 0;
+    const montoPagado = pago?.monto || 0;
+    const montoPendiente = Math.max(montoEsperado - montoPagado, 0);
+
+    if (montoPendiente <= 0) {
+      return null;
+    }
+
+    return {
+      mes,
+      montoPagado,
+      montoEsperado,
+      montoPendiente,
+      incompleto: montoPagado > 0 && montoPagado < montoEsperado
+    };
+  }).filter(Boolean);
+
+  const totalPagadoMeses = mesesPagados.reduce((total, item) => total + item.monto, 0);
+  const totalPendienteMeses = mesesPendientes.reduce(
+    (total, item) => total + item.montoPendiente,
+    0
   );
 
-  const totalPagado = mesesPagados.reduce((total, item) => total + item.monto, 0);
-  const diferenciaMeses = mesesPagados.reduce((total, item) => {
-    const faltante = item.montoEsperado - item.monto;
-    return total + (faltante > 0 ? faltante : 0);
-  }, 0);
-
-  const totalPendienteMeses =
-    mesesPendientes.reduce((total, mes) => total + (VALOR_MES[mes] || 0), 0) +
-    diferenciaMeses;
-
   const cuotasExtra = obtenerCuotasExtra(fila, configuracion);
-  const totalCuotasExtra = cuotasExtra.reduce((total, item) => total + item.monto, 0);
+  const totalPagadoCuotasExtra = cuotasExtra.reduce((total, item) => total + item.montoPagado, 0);
+  const totalPendienteCuotasExtra = cuotasExtra.reduce(
+    (total, item) => total + item.montoPendiente,
+    0
+  );
 
   return {
     id: index + 1,
@@ -133,8 +157,12 @@ export function crearVecino(fila, index, configuracion = CONFIGURACION_COLUMNAS_
     estado: fila.ESTADO || 'Pendiente',
     mesesPagados,
     mesesPendientes,
-    totalPagado,
-    totalPendiente: totalPendienteMeses + totalCuotasExtra,
+    totalPagado: totalPagadoMeses,
+    totalPagadoMeses,
+    totalPagadoCuotasExtra,
+    totalPendiente: totalPendienteMeses + totalPendienteCuotasExtra,
+    totalPendienteMeses,
+    totalPendienteCuotasExtra,
     cuotasExtra
   };
 }
