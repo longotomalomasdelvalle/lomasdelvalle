@@ -40,6 +40,7 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
   const [filasModificadas, setFilasModificadas] = useState([]);
+  const [ultimoRespaldoGithub, setUltimoRespaldoGithub] = useState(null);
   const [configuracion, setConfiguracion] = useState(
     normalizarConfiguracionColumnas()
   );
@@ -58,6 +59,7 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
       setFilasModificadas([]);
       setMensaje('');
       setError('');
+      setUltimoRespaldoGithub(null);
       return;
     }
 
@@ -87,6 +89,7 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
           .filter((fila) => !esFilaFantasma(fila))
       );
       setFilasModificadas([]);
+      setUltimoRespaldoGithub(null);
     } catch (fetchError) {
       console.error('Error cargando filas admin', fetchError);
       setError('No se pudieron cargar los vecinos.');
@@ -389,6 +392,44 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
     setError('');
   }
 
+  async function respaldarGithub() {
+    try {
+      setGuardando(true);
+      setError('');
+      setMensaje('');
+
+      const response = await fetch('/api/admin/backup/github', {
+        method: 'POST',
+        credentials: 'same-origin'
+      });
+
+      const data = await leerRespuestaJson(response);
+      if (!response.ok || !data.ok) {
+        setError(
+          data.message || mensajeErrorHttp(response, 'No se pudo crear el respaldo en GitHub.')
+        );
+        return false;
+      }
+
+      setMensaje(data.message || 'Respaldo en GitHub creado correctamente.');
+      setUltimoRespaldoGithub({
+        repo: data.repo || '',
+        branch: data.branch || '',
+        path: data.path || '',
+        commitSha: data.commitSha || '',
+        fileUrl: data.fileUrl || '',
+        generadoEn: data.generadoEn || new Date().toISOString()
+      });
+      return true;
+    } catch (fetchError) {
+      console.error('Error respaldando en GitHub', fetchError);
+      setError('No se pudo crear el respaldo en GitHub.');
+      return false;
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   return {
     filas,
     configuracion,
@@ -396,6 +437,7 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
     guardando,
     mensaje,
     error,
+    ultimoRespaldoGithub,
     actualizarCelda,
     eliminarColumnaConfigurada,
     agregarFila,
@@ -406,6 +448,7 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
     importarExcel,
     exportarExcel,
     exportarJson,
+    respaldarGithub,
     recargar: cargarFilas
   };
 }

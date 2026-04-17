@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import EstadoCarga from './components/EstadoCarga';
 import AdminAnalytics from './components/AdminAnalytics';
 import AdminVecinosGrid from './components/AdminVecinosGrid';
-import EstadisticasAdmin from './components/EstadisticasAdmin';
 import FiltrosBusqueda from './components/FiltrosBusqueda';
 import LoginAdmin from './components/LoginAdmin';
 import TarjetaVecino from './components/TarjetaVecino';
@@ -72,8 +71,7 @@ export default function PortalPagosPasaje() {
   const [mostrarLogin, setMostrarLogin] = useState(false);
   const [usuarioAdmin, setUsuarioAdmin] = useState('');
   const [claveAdmin, setClaveAdmin] = useState('');
-  const [adminVista, setAdminVista] = useState('planilla');
-  const [vistaAnalitica, setVistaAnalitica] = useState('panel');
+  const [adminVista, setAdminVista] = useState('analitica');
   const [tema, setTema] = useState(() => localStorage.getItem('tema_lomas') || 'claro');
   const {
     logueado,
@@ -92,16 +90,17 @@ export default function PortalPagosPasaje() {
     guardando: guardandoAdminVecinos,
     mensaje: mensajeAdminVecinos,
     error: errorAdminVecinos,
+    ultimoRespaldoGithub,
     actualizarCelda,
     eliminarColumnaConfigurada,
     agregarFila,
     eliminarFila,
     reemplazarFila,
     guardarFilas,
-    normalizarPlanilla,
     importarExcel,
     exportarExcel,
-    exportarJson
+    exportarJson,
+    respaldarGithub
   } = useAdminVecinos(logueado, recargar);
 
   useEffect(() => {
@@ -114,8 +113,7 @@ export default function PortalPagosPasaje() {
     const ok = await iniciarSesion(usuarioAdmin, claveAdmin);
 
     if (ok) {
-      setAdminVista('planilla');
-      setVistaAnalitica('panel');
+      setAdminVista('analitica');
       setMostrarLogin(false);
       setUsuarioAdmin('');
       setClaveAdmin('');
@@ -219,16 +217,6 @@ export default function PortalPagosPasaje() {
             <div className="rounded-2xl bg-white border border-slate-200 p-2 shadow-sm">
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => setAdminVista('planilla')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                    adminVista === 'planilla'
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  Planilla
-                </button>
-                <button
                   onClick={() => setAdminVista('analitica')}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
                     adminVista === 'analitica'
@@ -236,12 +224,32 @@ export default function PortalPagosPasaje() {
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
-                  Analitica
+                  Analitica detallada
+                </button>
+                <button
+                  onClick={() => setAdminVista('gestion')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                    adminVista === 'gestion'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Gestion planilla
                 </button>
               </div>
             </div>
 
-            {adminVista === 'planilla' ? (
+            {adminVista === 'analitica' ? (
+              <AdminAnalytics
+                filas={filas}
+                configuracion={configuracion}
+                guardando={guardandoAdminVecinos}
+                onReplaceRow={reemplazarFila}
+                onSave={guardarFilas}
+              />
+            ) : null}
+
+            {adminVista === 'gestion' ? (
               <AdminVecinosGrid
                 filas={filas}
                 configuracion={configuracion}
@@ -255,54 +263,12 @@ export default function PortalPagosPasaje() {
                 onDeleteRow={eliminarFila}
                 onReplaceRow={reemplazarFila}
                 onSave={guardarFilas}
-                onNormalize={normalizarPlanilla}
                 onImportExcel={importarExcel}
                 onExportExcel={exportarExcel}
                 onExportJson={exportarJson}
+                onBackupGithub={respaldarGithub}
+                ultimoRespaldoGithub={ultimoRespaldoGithub}
               />
-            ) : null}
-
-            {adminVista === 'analitica' ? (
-              <div className="space-y-4">
-                <div className="rounded-2xl bg-white border border-slate-200 p-2 shadow-sm">
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setVistaAnalitica('panel')}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                        vistaAnalitica === 'panel'
-                          ? 'bg-slate-900 text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      Panel general
-                    </button>
-                    <button
-                      onClick={() => setVistaAnalitica('detalle')}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                        vistaAnalitica === 'detalle'
-                          ? 'bg-slate-900 text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      Analitica detallada
-                    </button>
-                  </div>
-                </div>
-
-                {vistaAnalitica === 'panel' ? (
-                  <EstadisticasAdmin filas={filas} configuracion={configuracion} />
-                ) : null}
-
-                {vistaAnalitica === 'detalle' ? (
-                  <AdminAnalytics
-                    filas={filas}
-                    configuracion={configuracion}
-                    guardando={guardandoAdminVecinos}
-                    onReplaceRow={reemplazarFila}
-                    onSave={guardarFilas}
-                  />
-                ) : null}
-              </div>
             ) : null}
           </div>
         ) : null}

@@ -5,11 +5,12 @@ import {
   esFilaFantasma,
   formatearContactoEditable,
   formatearRutEditable,
+  normalizarFilaEditable,
   sanitizarValorCelda,
   validarContacto,
   validarRut
 } from '../utils/adminRows.js';
-import { crearVecino, limpiarNumero, normalizarTexto } from '../utils/pagos.js';
+import { crearVecino, limpiarNumero, normalizarNombrePropietario, normalizarTexto } from '../utils/pagos.js';
 
 function formatearMonto(valor) {
   return `$${Number(valor || 0).toLocaleString('es-CL')}`;
@@ -46,34 +47,46 @@ const CAMPOS_BASE_DETALLE = [
   'F/FIRMA',
   'OBSERVACION',
   'PARCELA',
-  'SITIO',
-  'ESTADO'
+  'SITIO'
 ];
 
-function obtenerEtiquetaDetalle(campo) {
-  const campoNormalizado = String(campo ?? '').trim().toUpperCase().replace(/\s+/g, '');
+function normalizarCampoDetalle(campo) {
+  return String(campo ?? '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]/g, '');
+}
 
-  if (campoNormalizado === 'RODERA' || campoNormalizado === 'R' || campoNormalizado === 'RUT') return 'RUT';
-  if (campoNormalizado === 'NOMBREDEPROPIETARIO') return 'Nombre';
-  if (campoNormalizado === 'N-CONTACTO' || campoNormalizado === 'N_CONTACTO' || campoNormalizado === 'CONTACTO' || campoNormalizado === 'NUMERODECONTACTO') return 'Contacto';
-  if (campoNormalizado === 'F/FIRMA' || campoNormalizado === 'FECHAFIRMA') return 'Fecha firma';
-  if (campoNormalizado === 'OBSERVACION' || campoNormalizado === 'OBSERVACIONES') return 'Observacion';
+function obtenerClaveCanonicaDetalle(campo) {
+  const campoNormalizado = normalizarCampoDetalle(campo);
+  if (!campoNormalizado) return '';
+  if (campoNormalizado === 'R' || campoNormalizado.includes('RODERA') || campoNormalizado === 'RUT') return 'RUT';
+  if (campoNormalizado === 'NCONTACTO' || campoNormalizado === 'CONTACTO' || campoNormalizado === 'NUMERODECONTACTO') return 'NCONTACTO';
+  if (campoNormalizado === 'NOMBREDEPROPIETARIO') return 'NOMBREDEPROPIETARIO';
+  if (campoNormalizado === 'FFIRMA' || campoNormalizado === 'FECHAFIRMA') return 'FFIRMA';
+  if (campoNormalizado === 'OBSERVACION' || campoNormalizado === 'OBSERVACIONES') return 'OBSERVACION';
+  if (campoNormalizado === 'ESTADO') return 'ESTADO';
+  return campoNormalizado;
+}
+
+function obtenerEtiquetaDetalle(campo) {
+  const campoCanonico = obtenerClaveCanonicaDetalle(campo);
+  if (campoCanonico === 'RUT') return 'RUT';
+  if (campoCanonico === 'NOMBREDEPROPIETARIO') return 'Nombre';
+  if (campoCanonico === 'NCONTACTO') return 'Contacto';
+  if (campoCanonico === 'FFIRMA') return 'Fecha firma';
+  if (campoCanonico === 'OBSERVACION') return 'Observacion';
   return campo;
 }
 
 function esCampoRutDetalle(campo) {
-  const campoNormalizado = String(campo ?? '').trim().toUpperCase().replace(/\s+/g, '');
-  return campoNormalizado === 'RUT' || campoNormalizado === 'R' || campoNormalizado.includes('RODERA');
+  return obtenerClaveCanonicaDetalle(campo) === 'RUT';
 }
 
 function esCampoContactoDetalle(campo) {
-  const campoNormalizado = String(campo ?? '').trim().toUpperCase().replace(/\s+/g, '');
-  return (
-    campoNormalizado === 'N-CONTACTO' ||
-    campoNormalizado === 'N_CONTACTO' ||
-    campoNormalizado === 'CONTACTO' ||
-    campoNormalizado === 'NUMERODECONTACTO'
-  );
+  return obtenerClaveCanonicaDetalle(campo) === 'NCONTACTO';
 }
 
 function esCampoMonetarioDetalle(campo, columnasCuotaExtra = []) {
@@ -157,7 +170,7 @@ function descargarExcelAnalitica(data) {
       'Ultimo mes con pago'
     ],
     ...data.vecinosOrdenados.map((v) => [
-      v.nombre,
+      nombreVisible(v.nombre),
       v.parcela,
       v.sitio,
       v.estado,
@@ -169,10 +182,134 @@ function descargarExcelAnalitica(data) {
     ])
   ];
 
+  const columnasDetectadas = [
+    ...new Set(
+      data.vecinosOrdenados.flatMap((vecino) =>
+        Object.keys(vecino.filaOriginal || {}).filter((columna) => String(columna).trim() !== '')
+      )
+    )
+  ];
+  const columnasBaseDetalle = [
+    'NOMBRE DE PROPIETARIO',
+    'RUT',
+    'N-CONTACTO',
+    'F/FIRMA',
+    'OBSERVACION',
+    'PARCELA',
+    'SITIO',
+    'ESTADO',
+    ...TODOS_LOS_MESES
+  ];
+  const columnasDetalleOrdenadas = [
+    ...columnasBaseDetalle.filter((columna) => columnasDetectadas.includes(columna)),
+    ...columnasDetectadas.filter((columna) => !columnasBaseDetalle.includes(columna))
+  ];
+
+  const detalleCompleto = [
+    [
+      'Nombre',
+      'Parcela',
+      'Sitio',
+      'Estado',
+      'Total pagado',
+      'Total pendiente',
+      'Meses completos',
+      'Meses con aporte',
+      'Ultimo mes con pago',
+      ...columnasDetalleOrdenadas
+    ],
+    ...data.vecinosOrdenados.map((v) => [
+      nombreVisible(v.nombre),
+      v.parcela,
+      v.sitio,
+      v.estado,
+      v.totalPagado,
+      v.totalPendiente,
+      v.mesesCompletos,
+      v.mesesConAporte,
+      v.ultimoMesConPago,
+      ...columnasDetalleOrdenadas.map((columna) => v.filaOriginal?.[columna] ?? '')
+    ])
+  ];
+
+  function ref(col, row) {
+    return XLSX.utils.encode_cell({ c: col, r: row });
+  }
+
+  function aplicarEstiloCabecera(sheet, columnas, fila = 0) {
+    for (let col = 0; col < columnas; col += 1) {
+      const celda = sheet[ref(col, fila)];
+      if (!celda) continue;
+      celda.s = {
+        font: { bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: '1F4E78' } },
+        alignment: { horizontal: 'center', vertical: 'center' }
+      };
+    }
+  }
+
+  function aplicarFormatoMoneda(sheet, col, filaInicio, filaFin) {
+    for (let row = filaInicio; row <= filaFin; row += 1) {
+      const celda = sheet[ref(col, row)];
+      if (!celda || typeof celda.v !== 'number') continue;
+      celda.z = '$#,##0';
+    }
+  }
+
+  function aplicarFormatoPorcentaje(sheet, col, filaInicio, filaFin) {
+    for (let row = filaInicio; row <= filaFin; row += 1) {
+      const celda = sheet[ref(col, row)];
+      if (!celda || typeof celda.v !== 'number') continue;
+      celda.z = '0.0%';
+    }
+  }
+
+  const wsResumen = XLSX.utils.aoa_to_sheet(resumen);
+  wsResumen['!cols'] = [{ wch: 34 }, { wch: 20 }];
+  wsResumen['!autofilter'] = { ref: 'A1:B1' };
+  aplicarEstiloCabecera(wsResumen, 2, 0);
+  aplicarFormatoMoneda(wsResumen, 1, 1, 5);
+  if (wsResumen.B7 && typeof wsResumen.B7.v === 'number') wsResumen.B7.v /= 100;
+  aplicarFormatoPorcentaje(wsResumen, 1, 6, 6);
+
+  const wsMensual = XLSX.utils.aoa_to_sheet(mensual);
+  wsMensual['!cols'] = [{ wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }];
+  wsMensual['!autofilter'] = { ref: `A1:F${mensual.length}` };
+  aplicarEstiloCabecera(wsMensual, 6, 0);
+  aplicarFormatoMoneda(wsMensual, 1, 1, mensual.length - 1);
+  aplicarFormatoMoneda(wsMensual, 2, 1, mensual.length - 1);
+  aplicarFormatoMoneda(wsMensual, 3, 1, mensual.length - 1);
+  for (let row = 1; row < mensual.length; row += 1) {
+    const celda = wsMensual[ref(4, row)];
+    if (celda && typeof celda.v === 'number') celda.v /= 100;
+  }
+  aplicarFormatoPorcentaje(wsMensual, 4, 1, mensual.length - 1);
+
+  const wsVecinos = XLSX.utils.aoa_to_sheet(vecinos);
+  wsVecinos['!cols'] = [
+    { wch: 40 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 18 }
+  ];
+  wsVecinos['!autofilter'] = { ref: `A1:I${vecinos.length}` };
+  aplicarEstiloCabecera(wsVecinos, 9, 0);
+  aplicarFormatoMoneda(wsVecinos, 4, 1, vecinos.length - 1);
+  aplicarFormatoMoneda(wsVecinos, 5, 1, vecinos.length - 1);
+
+  const wsDetalle = XLSX.utils.aoa_to_sheet(detalleCompleto);
+  wsDetalle['!cols'] = [
+    { wch: 40 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 18 },
+    ...columnasDetalleOrdenadas.map(() => ({ wch: 14 }))
+  ];
+  const ultimaColDetalle = XLSX.utils.encode_col(8 + columnasDetalleOrdenadas.length);
+  wsDetalle['!autofilter'] = { ref: `A1:${ultimaColDetalle}${detalleCompleto.length}` };
+  aplicarEstiloCabecera(wsDetalle, 9 + columnasDetalleOrdenadas.length, 0);
+  aplicarFormatoMoneda(wsDetalle, 4, 1, detalleCompleto.length - 1);
+  aplicarFormatoMoneda(wsDetalle, 5, 1, detalleCompleto.length - 1);
+
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(resumen), 'Resumen');
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(mensual), 'Mensual');
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(vecinos), 'Vecinos');
+  XLSX.utils.book_append_sheet(workbook, wsResumen, 'Resumen');
+  XLSX.utils.book_append_sheet(workbook, wsMensual, 'Mensual');
+  XLSX.utils.book_append_sheet(workbook, wsVecinos, 'Vecinos');
+  XLSX.utils.book_append_sheet(workbook, wsDetalle, 'Detalle completo');
 
   const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([excelBuffer], {
@@ -273,6 +410,10 @@ function coincideNombreFlexible(nombreVecino, filtroNombre) {
   return tokensFiltro.every((token) => tokensNombre.some((parte) => parte.includes(token)));
 }
 
+function nombreVisible(nombre) {
+  return normalizarNombrePropietario(String(nombre ?? '').trim());
+}
+
 export default function AdminAnalytics({
   filas,
   configuracion,
@@ -304,11 +445,19 @@ export default function AdminAnalytics({
     const aniosDisponibles = obtenerAniosPlanilla(filasValidas);
     const filasPorAnio = filasValidas;
 
-    const vecinos = filasValidasConIndice.map(({ fila, indexOriginal }, indexVisible) => ({
-      ...crearVecino(fila, indexVisible, configuracion),
-      rowIndex: indexOriginal,
-      filaOriginal: fila
-    }));
+    const vecinos = filasValidasConIndice.map(({ fila, indexOriginal }, indexVisible) => {
+      const filaNormalizada = normalizarFilaEditable(fila, configuracion);
+      const nombreCanonico = normalizarNombrePropietario(String(
+        filaNormalizada['NOMBRE DE PROPIETARIO'] ?? filaNormalizada.PROPIETARIO ?? `Vecino ${indexVisible + 1}`
+      ).trim());
+
+      return {
+        ...crearVecino(filaNormalizada, indexVisible, configuracion),
+        nombre: nombreCanonico || `Vecino ${indexVisible + 1}`,
+        rowIndex: indexOriginal,
+        filaOriginal: filaNormalizada
+      };
+    });
 
     const totalPagado = vecinos.reduce((acc, vecino) => acc + vecino.totalPagado, 0);
     const totalPendiente = vecinos.reduce((acc, vecino) => acc + vecino.totalPendiente, 0);
@@ -389,7 +538,7 @@ export default function AdminAnalytics({
         return { ...vecino, pagadoMes, pendienteMes, nivelPago, estadoVisible };
       })
       .filter((vecino) => {
-        const coincideNombre = coincideNombreFlexible(vecino.nombre, busquedaNombre);
+        const coincideNombre = coincideNombreFlexible(nombreVisible(vecino.nombre), busquedaNombre);
         const coincideParcela =
           !filtroParcelaTexto || normalizarTexto(vecino.parcela).includes(filtroParcelaTexto);
         const coincideSitio =
@@ -465,6 +614,8 @@ export default function AdminAnalytics({
       totalPendiente,
       totalCuotasExtra,
       totalPendienteCuotasExtra,
+      totalPagadoMeses,
+      totalEsperadoMeses,
       porcentajeCumplimientoMeses:
         totalEsperadoMeses > 0 ? (totalPagadoMeses / totalEsperadoMeses) * 100 : 0,
       resumenMensual
@@ -496,41 +647,67 @@ export default function AdminAnalytics({
   const inicio = (paginaVisible - 1) * FILAS_POR_PAGINA;
   const vecinosPagina = vecinosFiltrados.slice(inicio, inicio + FILAS_POR_PAGINA);
   const resumenCabecera = useMemo(() => {
-    const totalVecinos = vecinosFiltrados.length;
-    const totalCompletos = vecinosFiltrados.filter((v) => v.nivelPago === 'completo').length;
-    const totalParciales = vecinosFiltrados.filter((v) => v.nivelPago === 'parcial').length;
-    const totalSinPago = vecinosFiltrados.filter((v) => v.nivelPago === 'sin_pago').length;
+    const vecinosResumen = vecinosFiltrados.length > 0 ? vecinosFiltrados : vecinosPagina;
+    const totalVecinos = vecinosResumen.length;
+    const totalCompletos = vecinosResumen.filter((v) => v.nivelPago === 'completo').length;
+    const totalParciales = vecinosResumen.filter((v) => v.nivelPago === 'parcial').length;
+    const totalSinPago = vecinosResumen.filter((v) => v.nivelPago === 'sin_pago').length;
     const totalAlDia = totalCompletos + totalParciales;
     const totalPendientes = totalSinPago;
-    const totalPagado = vecinosFiltrados.reduce((acc, v) => acc + v.totalPagado, 0);
-    const totalPendiente = vecinosFiltrados.reduce((acc, v) => acc + v.totalPendiente, 0);
-    const totalCuotasExtra = vecinosFiltrados.reduce((acc, v) => acc + v.totalPagadoCuotasExtra, 0);
-    const totalPendienteCuotasExtra = vecinosFiltrados.reduce(
-      (acc, v) => acc + v.totalPendienteCuotasExtra,
+    const totalPagado = vecinosResumen.reduce((acc, vecino) => acc + vecino.totalPagado, 0);
+    const totalPendiente = vecinosResumen.reduce(
+      (acc, vecino) => acc + (filtroMes === 'TODOS' ? vecino.totalPendiente : vecino.pendienteMes || 0),
       0
     );
-    const totalPagadoMeses = vecinosFiltrados.reduce((acc, v) => acc + v.totalPagadoMeses, 0);
-    const totalEsperadoMeses =
-      totalVecinos * TODOS_LOS_MESES.reduce((acc, mes) => acc + (VALOR_MES[mes] || 0), 0);
+    const totalCuotasExtra = vecinosResumen.reduce(
+      (acc, vecino) => acc + vecino.totalPagadoCuotasExtra,
+      0
+    );
+    const totalPendienteCuotasExtra = vecinosResumen.reduce(
+      (acc, vecino) => acc + vecino.totalPendienteCuotasExtra,
+      0
+    );
 
     return {
       totalVecinos,
-      totalAlDia,
+      totalCompletos,
       totalParciales,
+      totalAlDia,
       totalPendientes,
       totalPagado,
       totalPendiente,
       totalCuotasExtra,
       totalPendienteCuotasExtra,
-      porcentajeCumplimientoMeses:
-        totalEsperadoMeses > 0 ? (totalPagadoMeses / totalEsperadoMeses) * 100 : 0
+      porcentajeCumplimientoMeses: analiticaFiltrada.porcentajeCumplimientoMeses
     };
-  }, [vecinosFiltrados]);
+  }, [analiticaFiltrada.porcentajeCumplimientoMeses, filtroMes, vecinosFiltrados, vecinosPagina]);
+  const datosExportacion = useMemo(
+    () => ({
+      totalPagado: resumenCabecera.totalPagado,
+      totalPendiente: resumenCabecera.totalPendiente,
+      totalPagadoMeses: analiticaFiltrada.totalPagadoMeses,
+      totalCuotasExtra: resumenCabecera.totalCuotasExtra,
+      totalEsperadoMeses: analiticaFiltrada.totalEsperadoMeses,
+      porcentajeCumplimientoMeses: resumenCabecera.porcentajeCumplimientoMeses,
+      vecinosPagados: resumenCabecera.totalAlDia,
+      vecinosPendientes: resumenCabecera.totalPendientes,
+      vecinosSinPagos: analiticaFiltrada.totalSinPago,
+      resumenMensual: analiticaFiltrada.resumenMensual,
+      vecinosOrdenados: vecinosFiltrados
+    }),
+    [analiticaFiltrada, resumenCabecera, vecinosFiltrados]
+  );
 
   const columnasCuotaExtra = useMemo(
     () => configuracion?.cuotasExtra ?? [],
     [configuracion]
   );
+  const tituloCuotaExtra = useMemo(() => {
+    if (columnasCuotaExtra.length === 1) {
+      return `Cuota extra: ${columnasCuotaExtra[0]}`;
+    }
+    return 'Cuotas extra';
+  }, [columnasCuotaExtra]);
   const columnasTransversales = useMemo(
     () => configuracion?.camposTransversales ?? [],
     [configuracion]
@@ -546,6 +723,22 @@ export default function AdminAnalytics({
     ],
     [columnasCuotaExtra, columnasTransversales]
   );
+  const columnasDetalleVisibles = useMemo(() => {
+    const llavesCanonicasVistas = new Set();
+    return columnasDetalle.filter((campo) => {
+      const campoCanonico = obtenerClaveCanonicaDetalle(campo);
+      if (!campoCanonico || campoCanonico === 'ESTADO') {
+        return false;
+      }
+      if (campoCanonico === 'RUT' || campoCanonico === 'NCONTACTO') {
+        if (llavesCanonicasVistas.has(campoCanonico)) {
+          return false;
+        }
+        llavesCanonicasVistas.add(campoCanonico);
+      }
+      return true;
+    });
+  }, [columnasDetalle]);
   const hayFiltrosAplicados =
     filtroMes !== 'TODOS' ||
     filtroAnio !== 'TODOS' ||
@@ -562,12 +755,24 @@ export default function AdminAnalytics({
       return;
     }
 
+    const filaNormalizada = { ...fila };
+    if (!filaNormalizada.RUT) {
+      filaNormalizada.RUT = String(
+        filaNormalizada.RODERA ?? filaNormalizada.R ?? filaNormalizada.Rut ?? filaNormalizada.rut ?? ''
+      ).trim();
+    }
+    if (!filaNormalizada['N-CONTACTO']) {
+      filaNormalizada['N-CONTACTO'] = String(
+        filaNormalizada.CONTACTO ?? filaNormalizada['N_CONTACTO'] ?? filaNormalizada['NUMERO DE CONTACTO'] ?? ''
+      ).trim();
+    }
+
     setDetalleAbierto({
       modo,
       rowIndex: vecino.rowIndex,
-      nombre: vecino.nombre
+      nombre: nombreVisible(vecino.nombre)
     });
-    setDetalleFila({ ...fila });
+    setDetalleFila(filaNormalizada);
     setMensajeDetalle('');
   }
 
@@ -705,7 +910,7 @@ export default function AdminAnalytics({
           ) : null}
 
           <button
-            onClick={() => descargarExcelAnalitica({ ...data, vecinosOrdenados: vecinosFiltrados })}
+            onClick={() => descargarExcelAnalitica(datosExportacion)}
             className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 text-white px-4 py-2 text-sm font-medium hover:bg-emerald-700 transition"
           >
             <IconoGrafico />
@@ -726,17 +931,17 @@ export default function AdminAnalytics({
               <p className="mt-1 text-lg font-bold text-slate-900">
                 {formatearMonto(resumenCabecera.totalPagado)}
               </p>
-              <p className="text-xs text-slate-500 mt-1">
-                / {formatearMonto(resumenCabecera.totalPendiente)} faltante
+              <p className="text-xs text-red-600 mt-1 font-semibold">
+                {formatearMonto(resumenCabecera.totalPendiente)}
               </p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs text-slate-500">Cuotas extra</p>
+              <p className="text-xs text-slate-500">{tituloCuotaExtra}</p>
               <p className="mt-1 text-lg font-bold text-amber-700">
                 {formatearMonto(resumenCabecera.totalCuotasExtra)}
               </p>
-              <p className="text-xs text-slate-500 mt-1">
-                / {formatearMonto(resumenCabecera.totalPendienteCuotasExtra)} faltante
+              <p className="text-xs text-red-600 mt-1 font-semibold">
+                {formatearMonto(resumenCabecera.totalPendienteCuotasExtra)}
               </p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -921,7 +1126,87 @@ export default function AdminAnalytics({
           Mostrando {vecinosPagina.length} de {vecinosFiltrados.length} vecinos filtrados
         </div>
 
-        <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+        <div className="md:hidden space-y-2">
+          {vecinosPagina.map((vecino) => (
+            <article key={`mobile-${vecino.id}`} className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-900 leading-snug break-words">
+                  {nombreVisible(vecino.nombre)}
+                </p>
+                <button
+                  onClick={() => abrirDetalle(vecino, 'ver')}
+                  title="Ver detalle"
+                  translate="no"
+                  className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 shrink-0"
+                >
+                  <IconoVer />
+                  <span className="notranslate">Ver</span>
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                <p className="text-slate-500">Parcela / Sitio</p>
+                <p className="text-right text-slate-700">
+                  P{vecino.parcela} / S{vecino.sitio}
+                </p>
+                <p className="text-slate-500">Estado</p>
+                <p className="text-right">
+                  <span
+                    className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${
+                      vecino.estadoVisible === 'Pagado'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}
+                  >
+                    {vecino.estadoVisible}
+                  </span>
+                </p>
+                <p className="text-slate-500">Nivel pago</p>
+                <p className="text-right">
+                  <span
+                    className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${
+                      vecino.nivelPago === 'completo'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : vecino.nivelPago === 'parcial'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {vecino.nivelPago === 'completo'
+                      ? 'Completo'
+                      : vecino.nivelPago === 'parcial'
+                        ? 'Parcial'
+                        : 'Pendiente'}
+                  </span>
+                </p>
+                <p className="text-slate-500">Pagado</p>
+                <p className="text-right text-emerald-700 font-semibold">{formatearMonto(vecino.totalPagado)}</p>
+                <p className="text-slate-500">Pendiente</p>
+                <p className="text-right text-red-600 font-semibold">{formatearMonto(vecino.totalPendiente)}</p>
+                <p className="text-slate-500">Meses completos</p>
+                <p className="text-right text-slate-700">
+                  {vecino.mesesCompletos} / {TODOS_LOS_MESES.length}
+                </p>
+                <p className="text-slate-500">Ultimo pago</p>
+                <p className="text-right text-slate-700">{normalizarMesVisible(vecino.ultimoMesConPago)}</p>
+                {filtroMes !== 'TODOS' ? (
+                  <>
+                    <p className="text-slate-500">{`Pagado ${filtroMes}`}</p>
+                    <p className="text-right text-emerald-700 font-semibold">{formatearMonto(vecino.pagadoMes)}</p>
+                    <p className="text-slate-500">{`Pendiente ${filtroMes}`}</p>
+                    <p className="text-right text-red-600 font-semibold">{formatearMonto(vecino.pendienteMes)}</p>
+                  </>
+                ) : null}
+              </div>
+            </article>
+          ))}
+          {vecinosPagina.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
+              No hay vecinos para ese filtro.
+            </div>
+          ) : null}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto border border-slate-200 rounded-2xl">
           <table
             className={`w-full table-fixed text-xs md:text-sm ${
               filtroMes !== 'TODOS' ? 'min-w-[1180px]' : 'min-w-0'
@@ -951,9 +1236,9 @@ export default function AdminAnalytics({
                 <tr key={vecino.id} className="border-t border-slate-200">
                   <td
                     className="px-3 py-2 text-slate-900 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[180px] md:max-w-[280px] xl:max-w-[360px]"
-                    title={vecino.nombre}
+                    title={nombreVisible(vecino.nombre)}
                   >
-                    {vecino.nombre}
+                    {nombreVisible(vecino.nombre)}
                   </td>
                   <td className="px-3 py-2 text-slate-600">
                     P{vecino.parcela} / S{vecino.sitio}
@@ -1147,7 +1432,7 @@ export default function AdminAnalytics({
 
             <div className="max-h-[68vh] overflow-y-auto px-4 md:px-6 py-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {columnasDetalle.map((campo) => (
+                {columnasDetalleVisibles.map((campo) => (
                   <label key={campo} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                     <p className="text-[11px] uppercase tracking-wide font-semibold text-slate-500">
                       {obtenerEtiquetaDetalle(campo)}

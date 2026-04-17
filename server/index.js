@@ -22,6 +22,110 @@ const COOKIE_BASE = {
   secure: process.env.NODE_ENV === 'production'
 };
 
+function parsearRepositorioGithub(valor) {
+  const limpio = String(valor ?? '').trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '');
+  const partes = limpio.split('/').filter(Boolean);
+  if (partes.length < 2) {
+    return { owner: '', repo: '' };
+  }
+  return { owner: partes[0], repo: partes[1] };
+}
+
+function codificarPathGithub(pathname) {
+  return String(pathname || '')
+    .split('/')
+    .filter(Boolean)
+    .map((segmento) => encodeURIComponent(segmento))
+    .join('/');
+}
+
+async function crearRespaldoGithub() {
+  const token = String(process.env.GITHUB_TOKEN ?? '').trim();
+  const repoConfig = String(process.env.GITHUB_BACKUP_REPO ?? '').trim();
+  const branch = String(process.env.GITHUB_BACKUP_BRANCH ?? 'main').trim() || 'main';
+  const rutaRespaldo = String(process.env.GITHUB_BACKUP_PATH ?? 'respaldos/vecinos-respaldo.json').trim();
+
+  if (!token || !repoConfig) {
+    throw new Error(
+      'Configura GITHUB_TOKEN y GITHUB_BACKUP_REPO para habilitar el respaldo en GitHub.'
+    );
+  }
+
+  const { owner, repo } = parsearRepositorioGithub(repoConfig);
+  if (!owner || !repo) {
+    throw new Error('GITHUB_BACKUP_REPO debe tener formato owner/repo.');
+  }
+
+  const [filas, configuracion] = await Promise.all([
+    cargarFilasVecinos(),
+    cargarConfiguracionColumnas()
+  ]);
+
+  const generadoEn = new Date().toISOString();
+  const payload = {
+    generadoEn,
+    fuente: 'lomasdelvalle-admin',
+    branch,
+    configuracion,
+    filas
+  };
+  const contenidoBase64 = Buffer.from(JSON.stringify(payload, null, 2), 'utf8').toString('base64');
+  const rutaCodificada = codificarPathGithub(rutaRespaldo);
+  const endpointBase = `https://api.github.com/repos/${owner}/${repo}/contents/${rutaCodificada}`;
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${token}`,
+    'User-Agent': 'lomasdelvalle-admin'
+  };
+
+  let shaActual;
+  const consultaActual = await fetch(`${endpointBase}?ref=${encodeURIComponent(branch)}`, {
+    headers
+  });
+  if (consultaActual.status === 200) {
+    const actual = await consultaActual.json();
+    shaActual = actual?.sha;
+  } else if (consultaActual.status !== 404) {
+    const detalle = await consultaActual.text();
+    throw new Error(`GitHub respondio ${consultaActual.status}: ${detalle}`);
+  }
+
+  const commitMessage = `chore: respaldo planilla ${new Date().toISOString()}`;
+  const body = {
+    message: commitMessage,
+    content: contenidoBase64,
+    branch
+  };
+  if (shaActual) {
+    body.sha = shaActual;
+  }
+
+  const escritura = await fetch(endpointBase, {
+    method: 'PUT',
+    headers: {
+      ...headers,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  const resultado = await escritura.json().catch(() => ({}));
+  if (!escritura.ok) {
+    const detalle = resultado?.message || `GitHub respondio ${escritura.status}`;
+    throw new Error(`No se pudo subir respaldo a GitHub: ${detalle}`);
+  }
+
+  return {
+    ok: true,
+    generadoEn,
+    repo: `${owner}/${repo}`,
+    path: rutaRespaldo,
+    branch,
+    commitSha: resultado?.commit?.sha || '',
+    fileUrl: resultado?.content?.html_url || ''
+  };
+}
+
 function responderJson(response, statusCode, body, extraHeaders = {}) {
   response.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -304,6 +408,31 @@ export async function handleRequest(request, response) {
       responderJson(response, 400, {
         ok: false,
         message: error.message || 'No se pudo normalizar la planilla.'
+      });
+    }
+
+    return;
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/admin/backup/github') {
+    const { sesion } = obtenerSesionRequest(request);
+
+    if (!sesion) {
+      responderNoAutorizado(response);
+      return;
+    }
+
+    try {
+      const resultado = await crearRespaldoGithub();
+      responderJson(response, 200, {
+        ok: true,
+        message: `Respaldo enviado a GitHub (${resultado.repo}@${resultado.branch}).`,
+        ...resultado
+      });
+    } catch (error) {
+      responderJson(response, 400, {
+        ok: false,
+        message: error.message || 'No se pudo crear el respaldo en GitHub.'
       });
     }
 

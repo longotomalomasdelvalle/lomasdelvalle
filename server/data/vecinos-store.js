@@ -27,6 +27,28 @@ const ALIAS_A_CANONICOS = {
   OBSERVACIONES: 'OBSERVACION'
 };
 
+function normalizarNombrePropietario(nombre) {
+  const limpio = String(nombre ?? '').trim().replace(/\s+/g, ' ');
+  if (!limpio) {
+    return '';
+  }
+
+  const partesDe = limpio.split(/\s+DE\s+/i).map((parte) => parte.trim()).filter(Boolean);
+  const pareceInversionConDe =
+    partesDe.length === 3 &&
+    !partesDe[0].includes(' ') &&
+    !partesDe[1].includes(' ') &&
+    partesDe[2].split(' ').length >= 2 &&
+    partesDe[2].split(' ').length <= 3;
+
+  if (!pareceInversionConDe) {
+    return limpio;
+  }
+
+  const nombres = partesDe[2].split(' ').reverse().join(' ');
+  return `${nombres} ${partesDe[1]} ${partesDe[0]}`.replace(/\s+/g, ' ').trim();
+}
+
 function normalizarClaveAlias(key) {
   return String(key ?? '').trim().replace(/\s+/g, ' ').toUpperCase();
 }
@@ -67,6 +89,13 @@ function normalizarFila(fila = {}) {
       filaNormalizada[claveCanonica] = valorNormalizado;
     }
   });
+
+  const nombreCanonico = String(filaNormalizada['NOMBRE DE PROPIETARIO'] ?? '').trim();
+  const nombreAlternativo = String(filaNormalizada.PROPIETARIO ?? '').trim();
+  filaNormalizada['NOMBRE DE PROPIETARIO'] = normalizarNombrePropietario(
+    nombreCanonico || nombreAlternativo
+  );
+  delete filaNormalizada.PROPIETARIO;
 
   return filaNormalizada;
 }
@@ -177,7 +206,11 @@ export async function cargarFilasVecinos() {
       return filasIniciales;
     }
 
-    return limpiarFilasResumen(filasBlob);
+    const filasLimpias = limpiarFilasResumen(filasBlob);
+    if (JSON.stringify(filasLimpias) !== JSON.stringify(filasBlob)) {
+      await escribirFilasBlob(filasLimpias);
+    }
+    return filasLimpias;
   }
 
   await asegurarDirectorio();

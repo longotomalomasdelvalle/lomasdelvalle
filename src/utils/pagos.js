@@ -39,6 +39,28 @@ export function normalizarTexto(texto) {
     .trim();
 }
 
+export function normalizarNombrePropietario(nombre) {
+  const limpio = String(nombre ?? '').trim().replace(/\s+/g, ' ');
+  if (!limpio) {
+    return '';
+  }
+
+  const partesDe = limpio.split(/\s+DE\s+/i).map((parte) => parte.trim()).filter(Boolean);
+  const pareceInversionConDe =
+    partesDe.length === 3 &&
+    !partesDe[0].includes(' ') &&
+    !partesDe[1].includes(' ') &&
+    partesDe[2].split(' ').length >= 2 &&
+    partesDe[2].split(' ').length <= 3;
+
+  if (!pareceInversionConDe) {
+    return limpio;
+  }
+
+  const nombres = partesDe[2].split(' ').reverse().join(' ');
+  return `${nombres} ${partesDe[1]} ${partesDe[0]}`.replace(/\s+/g, ' ').trim();
+}
+
 export function obtenerParcelaYSitio(fila) {
   const codigo = String(fila['PARC/ST'] || fila.SITIO || fila.PARCELA || '')
     .trim()
@@ -154,10 +176,13 @@ export function crearVecino(fila, index, configuracion = CONFIGURACION_COLUMNAS_
   );
   const estadoCalculado = tienePendientesHastaMesActual ? 'Pendiente' : 'Pagado';
 
+  const nombreBase = String(
+    fila['NOMBRE DE PROPIETARIO'] || fila.PROPIETARIO || `Vecino ${index + 1}`
+  ).trim();
+
   return {
     id: index + 1,
-    nombre:
-      fila['NOMBRE DE PROPIETARIO'] || fila.PROPIETARIO || `Vecino ${index + 1}`,
+    nombre: normalizarNombrePropietario(nombreBase),
     rut: String(obtenerValorCampo(fila, ['RUT', 'R']) ?? '').trim(),
     contacto: String(
       obtenerValorCampo(fila, ['N-CONTACTO', 'N_CONTACTO', 'NUMERO DE CONTACTO', 'CONTACTO']) ?? ''

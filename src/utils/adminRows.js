@@ -8,7 +8,7 @@ import {
   normalizarConfiguracionColumnas,
   normalizarNombreColumna
 } from './columnas.js';
-import { obtenerParcelaYSitio, obtenerValorCampo } from './pagos.js';
+import { normalizarNombrePropietario, obtenerParcelaYSitio, obtenerValorCampo } from './pagos.js';
 
 export const CAMPOS_FIJOS_ADMIN = [
   'NOMBRE DE PROPIETARIO',
@@ -237,6 +237,9 @@ export function crearFilaEditable(configuracion = CONFIGURACION_COLUMNAS_POR_DEF
 export function normalizarFilaEditable(fila, configuracion = CONFIGURACION_COLUMNAS_POR_DEFECTO) {
   const { parcela, sitio } = obtenerParcelaYSitio(fila);
   const filaCanonica = { ...fila };
+  const nombreCanonico = String(fila['NOMBRE DE PROPIETARIO'] ?? '').trim();
+  const nombreAlternativo = String(fila.PROPIETARIO ?? '').trim();
+  delete filaCanonica.PROPIETARIO;
 
   [...Object.values(ALIAS_COLUMNAS).flat(), ...CAMPOS_CORTA_FUEGO].forEach((alias) => {
     delete filaCanonica[alias];
@@ -260,6 +263,7 @@ export function normalizarFilaEditable(fila, configuracion = CONFIGURACION_COLUM
   return {
     ...crearFilaEditable(configuracionNormalizada),
     ...filaCanonica,
+    'NOMBRE DE PROPIETARIO': normalizarNombrePropietario(nombreCanonico || nombreAlternativo),
     RUT: formatearRutEditable(obtenerValorCampo(fila, ALIAS_COLUMNAS.RUT)),
     'N-CONTACTO': formatearContactoEditable(
       obtenerValorCampo(fila, ALIAS_COLUMNAS['N-CONTACTO'])
