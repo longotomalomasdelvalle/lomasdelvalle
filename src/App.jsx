@@ -72,7 +72,8 @@ export default function PortalPagosPasaje() {
   const [mostrarLogin, setMostrarLogin] = useState(false);
   const [usuarioAdmin, setUsuarioAdmin] = useState('');
   const [claveAdmin, setClaveAdmin] = useState('');
-  const [adminVista, setAdminVista] = useState('dashboard');
+  const [adminVista, setAdminVista] = useState('planilla');
+  const [vistaAnalitica, setVistaAnalitica] = useState('panel');
   const [tema, setTema] = useState(() => localStorage.getItem('tema_lomas') || 'claro');
   const {
     logueado,
@@ -113,7 +114,8 @@ export default function PortalPagosPasaje() {
     const ok = await iniciarSesion(usuarioAdmin, claveAdmin);
 
     if (ok) {
-      setAdminVista('dashboard');
+      setAdminVista('planilla');
+      setVistaAnalitica('panel');
       setMostrarLogin(false);
       setUsuarioAdmin('');
       setClaveAdmin('');
@@ -217,16 +219,6 @@ export default function PortalPagosPasaje() {
             <div className="rounded-2xl bg-white border border-slate-200 p-2 shadow-sm">
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => setAdminVista('dashboard')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                    adminVista === 'dashboard'
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  Dashboard
-                </button>
-                <button
                   onClick={() => setAdminVista('planilla')}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
                     adminVista === 'planilla'
@@ -248,10 +240,6 @@ export default function PortalPagosPasaje() {
                 </button>
               </div>
             </div>
-
-            {adminVista === 'dashboard' ? (
-              <EstadisticasAdmin filas={filas} configuracion={configuracion} />
-            ) : null}
 
             {adminVista === 'planilla' ? (
               <AdminVecinosGrid
@@ -275,7 +263,46 @@ export default function PortalPagosPasaje() {
             ) : null}
 
             {adminVista === 'analitica' ? (
-              <AdminAnalytics filas={filas} configuracion={configuracion} />
+              <div className="space-y-4">
+                <div className="rounded-2xl bg-white border border-slate-200 p-2 shadow-sm">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setVistaAnalitica('panel')}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                        vistaAnalitica === 'panel'
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      Panel general
+                    </button>
+                    <button
+                      onClick={() => setVistaAnalitica('detalle')}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                        vistaAnalitica === 'detalle'
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      Analitica detallada
+                    </button>
+                  </div>
+                </div>
+
+                {vistaAnalitica === 'panel' ? (
+                  <EstadisticasAdmin filas={filas} configuracion={configuracion} />
+                ) : null}
+
+                {vistaAnalitica === 'detalle' ? (
+                  <AdminAnalytics
+                    filas={filas}
+                    configuracion={configuracion}
+                    guardando={guardandoAdminVecinos}
+                    onReplaceRow={reemplazarFila}
+                    onSave={guardarFilas}
+                  />
+                ) : null}
+              </div>
             ) : null}
           </div>
         ) : null}

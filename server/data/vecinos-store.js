@@ -27,6 +27,17 @@ const ALIAS_A_CANONICOS = {
   OBSERVACIONES: 'OBSERVACION'
 };
 
+function normalizarClaveAlias(key) {
+  return String(key ?? '').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
+const ALIAS_A_CANONICOS_NORMALIZADOS = Object.fromEntries(
+  Object.entries(ALIAS_A_CANONICOS).map(([alias, canonico]) => [
+    normalizarClaveAlias(alias),
+    canonico
+  ])
+);
+
 function esErrorSoloLectura(error) {
   return ['EROFS', 'EPERM', 'EACCES'].includes(error?.code);
 }
@@ -43,7 +54,9 @@ function normalizarFila(fila = {}) {
   const filaNormalizada = {};
 
   Object.entries(fila).forEach(([key, value]) => {
-    const claveCanonica = ALIAS_A_CANONICOS[key] || key;
+    const claveOriginal = String(key ?? '').trim();
+    const claveNormalizada = normalizarClaveAlias(claveOriginal);
+    const claveCanonica = ALIAS_A_CANONICOS_NORMALIZADOS[claveNormalizada] || claveOriginal;
     const valorNormalizado = value === undefined || value === null ? '' : value;
 
     if (

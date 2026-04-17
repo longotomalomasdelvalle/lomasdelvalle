@@ -195,7 +195,7 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
     setFilas((actuales) =>
       actuales.map((actual, filaIndex) => (filaIndex === index ? fila : actual))
     );
-    setFilasModificadas((actuales) => actuales.filter((filaIndex) => filaIndex !== index));
+    setFilasModificadas((actuales) => [...new Set([...actuales, index])]);
   }
 
   async function normalizarPlanilla() {

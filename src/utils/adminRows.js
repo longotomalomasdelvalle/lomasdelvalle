@@ -279,7 +279,15 @@ export function normalizarFilaEditable(fila, configuracion = CONFIGURACION_COLUM
 }
 
 export function obtenerNombreVisibleColumna(columna) {
-  return NOMBRES_VISIBLES_COLUMNAS[columna] || normalizarNombreColumna(columna) || columna;
+  const crudo = String(columna ?? '').trim();
+  const normalizado = normalizarNombreColumna(columna);
+  const crudoSinEspacios = crudo.replace(/\s+/g, '').toUpperCase();
+
+  if (crudoSinEspacios.includes('RODERA') || crudoSinEspacios === 'R') {
+    return 'RUT';
+  }
+
+  return NOMBRES_VISIBLES_COLUMNAS[crudo] || normalizado || crudo;
 }
 
 export function esFilaFantasma(fila = {}) {
