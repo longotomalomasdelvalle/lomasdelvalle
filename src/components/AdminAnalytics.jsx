@@ -3,8 +3,10 @@ import * as XLSX from 'xlsx';
 import { TODOS_LOS_MESES, VALOR_MES } from '../constants/pagos.js';
 import {
   esFilaFantasma,
+  formatearContactoEditable,
   formatearRutEditable,
   sanitizarValorCelda,
+  validarContacto,
   validarRut
 } from '../utils/adminRows.js';
 import { crearVecino, limpiarNumero, normalizarTexto } from '../utils/pagos.js';
@@ -61,7 +63,17 @@ function obtenerEtiquetaDetalle(campo) {
 
 function esCampoRutDetalle(campo) {
   const campoNormalizado = String(campo ?? '').trim().toUpperCase().replace(/\s+/g, '');
-  return campoNormalizado === 'RUT' || campoNormalizado === 'R' || campoNormalizado === 'RODERA';
+  return campoNormalizado === 'RUT' || campoNormalizado === 'R' || campoNormalizado.includes('RODERA');
+}
+
+function esCampoContactoDetalle(campo) {
+  const campoNormalizado = String(campo ?? '').trim().toUpperCase().replace(/\s+/g, '');
+  return (
+    campoNormalizado === 'N-CONTACTO' ||
+    campoNormalizado === 'N_CONTACTO' ||
+    campoNormalizado === 'CONTACTO' ||
+    campoNormalizado === 'NUMERODECONTACTO'
+  );
 }
 
 function esCampoMonetarioDetalle(campo, columnasCuotaExtra = []) {
@@ -575,6 +587,8 @@ export default function AdminAnalytics({
   function actualizarDetalle(campo, valor) {
     const valorNormalizado = esCampoRutDetalle(campo)
       ? formatearRutEditable(valor)
+      : esCampoContactoDetalle(campo)
+        ? formatearContactoEditable(valor)
       : sanitizarValorCelda(campo, valor, columnasCuotaExtra);
 
     setDetalleFila((actual) => {
@@ -1121,7 +1135,8 @@ export default function AdminAnalytics({
                           value={detalleFila[campo] ?? ''}
                           onChange={(event) => actualizarDetalle(campo, event.target.value)}
                           className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${
-                            esCampoRutDetalle(campo) && !validarRut(detalleFila[campo]).valido
+                            (esCampoRutDetalle(campo) && !validarRut(detalleFila[campo]).valido) ||
+                            (esCampoContactoDetalle(campo) && !validarContacto(detalleFila[campo]).valido)
                               ? 'border-red-300 bg-red-50 text-red-700'
                               : 'border-slate-300'
                           }`}
@@ -1134,6 +1149,11 @@ export default function AdminAnalytics({
                         {esCampoRutDetalle(campo) && !validarRut(detalleFila[campo]).valido ? (
                           <span className="mt-1 block text-[11px] text-red-600">
                             {validarRut(detalleFila[campo]).sugerencia}
+                          </span>
+                        ) : null}
+                        {esCampoContactoDetalle(campo) && !validarContacto(detalleFila[campo]).valido ? (
+                          <span className="mt-1 block text-[11px] text-red-600">
+                            {validarContacto(detalleFila[campo]).sugerencia}
                           </span>
                         ) : null}
                       </>

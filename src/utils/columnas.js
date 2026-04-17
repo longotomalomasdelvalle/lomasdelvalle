@@ -65,6 +65,11 @@ export function normalizarNombreColumna(columna) {
     return COLUMNA_CUOTA_EXTRA_POR_DEFECTO;
   }
 
+  // Defensivo: planillas antiguas han llegado con variantes de "RODERA".
+  if (nombre === 'R' || nombre.includes('RODERA')) {
+    return 'RUT';
+  }
+
   return NOMBRES_VISIBLES_COLUMNAS[nombre] || nombre;
 }
 
