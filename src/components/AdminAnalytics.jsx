@@ -593,6 +593,28 @@ export default function AdminAnalytics({
 
     setDetalleFila((actual) => {
       if (!actual) return actual;
+
+      // Guardamos en claves canonicas para evitar que alias heredados (RODERA/R)
+      // pisen el valor al normalizar/guardar en backend.
+      if (esCampoRutDetalle(campo)) {
+        return {
+          ...actual,
+          RUT: valorNormalizado,
+          R: '',
+          RODERA: ''
+        };
+      }
+
+      if (esCampoContactoDetalle(campo)) {
+        return {
+          ...actual,
+          'N-CONTACTO': valorNormalizado,
+          N_CONTACTO: '',
+          CONTACTO: '',
+          'NUMERO DE CONTACTO': ''
+        };
+      }
+
       return {
         ...actual,
         [campo]: valorNormalizado
