@@ -631,10 +631,15 @@ export default function AdminAnalytics({
     setMensajeDetalle('');
 
     try {
-      onReplaceRow(detalleAbierto.rowIndex, detalleFila);
+      const filasActualizadas = filas.map((fila, index) =>
+        index === detalleAbierto.rowIndex ? detalleFila : fila
+      );
 
       if (onSave) {
-        const guardadoOk = await onSave('Socio actualizado con exito.');
+        const guardadoOk = await onSave('Socio actualizado con exito.', {
+          filasOverride: filasActualizadas,
+          filasModificadasOverride: [detalleAbierto.rowIndex]
+        });
 
         if (!guardadoOk) {
           setMensajeDetalle('No se pudo guardar. Revisa los datos e intenta nuevamente.');
@@ -642,6 +647,7 @@ export default function AdminAnalytics({
         }
       }
 
+      onReplaceRow(detalleAbierto.rowIndex, detalleFila);
       window.alert('Cambios guardados correctamente.');
       cerrarDetalle();
     } finally {

@@ -239,11 +239,18 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
     }
   }
 
-  async function guardarFilas(mensajeExito = 'Cambios guardados correctamente.') {
+  async function guardarFilas(
+    mensajeExito = 'Cambios guardados correctamente.',
+    opciones = {}
+  ) {
     try {
       setGuardando(true);
       setError('');
       setMensaje('');
+      const filasFuente = Array.isArray(opciones.filasOverride) ? opciones.filasOverride : filas;
+      const filasModificadasFuente = Array.isArray(opciones.filasModificadasOverride)
+        ? opciones.filasModificadasOverride
+        : filasModificadas;
 
       const response = await fetch('/api/admin/vecinos', {
         method: 'PUT',
@@ -252,10 +259,10 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          filas: filas
+          filas: filasFuente
             .map((fila, index) =>
               normalizarFilaEditable(
-                filasModificadas.includes(index) ? marcarFilaActualizada(fila) : fila,
+                filasModificadasFuente.includes(index) ? marcarFilaActualizada(fila) : fila,
                 configuracion
               )
             )
