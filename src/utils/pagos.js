@@ -45,6 +45,28 @@ export function normalizarNombrePropietario(nombre) {
     return '';
   }
 
+  const tokens = limpio.split(' ').filter(Boolean);
+  const tokensMayus = tokens.map((token) =>
+    normalizarTexto(token).replace(/[^a-z0-9]/g, '').toUpperCase()
+  );
+  const deIndexes = tokensMayus
+    .map((token, index) => (token === 'DE' ? index : -1))
+    .filter((index) => index >= 0);
+
+  const estructuraInversaSimple =
+    deIndexes.length >= 2 &&
+    deIndexes[0] === 1 &&
+    deIndexes[1] === 3 &&
+    tokens.length >= 6 &&
+    tokens.length <= 8;
+
+  if (estructuraInversaSimple) {
+    const apellido1 = tokens[0];
+    const apellido2 = tokens[2];
+    const nombres = tokens.slice(4).reverse();
+    return [...nombres, apellido2, apellido1].join(' ').replace(/\s+/g, ' ').trim();
+  }
+
   const partesDe = limpio.split(/\s+DE\s+/i).map((parte) => parte.trim()).filter(Boolean);
   const pareceInversionConDe =
     partesDe.length === 3 &&
