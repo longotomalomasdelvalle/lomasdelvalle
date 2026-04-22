@@ -58,7 +58,15 @@ export async function enviarCorreoComprobante(payload) {
       to: [config.to],
       subject,
       html,
-      text
+      text,
+      attachments: payload.archivoContenidoBase64
+        ? [
+            {
+              filename: payload.archivoNombre || 'comprobante.jpg',
+              content: payload.archivoContenidoBase64
+            }
+          ]
+        : undefined
     })
   });
 

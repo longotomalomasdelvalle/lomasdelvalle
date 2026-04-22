@@ -298,7 +298,8 @@ async function procesarComprobantePago(body, publicBaseUrl) {
     ...registro,
     blobPath,
     blobUrl: blob.url,
-    enlacePublico
+    enlacePublico,
+    archivoContenidoBase64: bytes.toString('base64')
   });
 
   if (notificacion.ok) {
