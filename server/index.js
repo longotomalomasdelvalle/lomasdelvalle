@@ -50,6 +50,15 @@ function extensionPorMime(mime) {
   return 'jpg';
 }
 
+function esBlobUrlValida(blobUrl) {
+  try {
+    const url = new URL(String(blobUrl || ''));
+    return url.protocol === 'https:' && /\.blob\.vercel-storage\.com$/i.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function parseDataUrlImagen(dataUrl) {
   const match = String(dataUrl || '').match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/);
   if (!match) {
@@ -280,7 +289,7 @@ async function procesarComprobantePago(body, publicBaseUrl) {
     blobUrl: blob.url,
     emailNotificado: false
   });
-  const enlacePublico = `${publicBaseUrl}/api/comprobantes/archivo?id=${encodeURIComponent(registro.id)}`;
+  const enlacePublico = `${publicBaseUrl}/api/comprobantes/archivo?u=${encodeURIComponent(blob.url)}`;
 
   const notificacion = await enviarCorreoComprobante({
     ...registro,
@@ -336,19 +345,31 @@ export async function handleRequest(request, response) {
   }
 
   if (request.method === 'GET' && url.pathname === '/api/comprobantes/archivo') {
+    const blobUrlDirecta = String(url.searchParams.get('u') || '').trim();
     const id = String(url.searchParams.get('id') || '').trim();
-    if (!id) {
-      responderJson(response, 400, { ok: false, message: 'Falta id de comprobante.' });
+    let blobUrl = '';
+    let archivoMime = 'application/octet-stream';
+
+    if (blobUrlDirecta) {
+      if (!esBlobUrlValida(blobUrlDirecta)) {
+        responderJson(response, 400, { ok: false, message: 'URL de comprobante invalida.' });
+        return;
+      }
+      blobUrl = blobUrlDirecta;
+    } else if (id) {
+      const registro = await obtenerRegistroComprobante(id);
+      if (!registro?.blobUrl) {
+        responderJson(response, 404, { ok: false, message: 'Comprobante no encontrado.' });
+        return;
+      }
+      blobUrl = registro.blobUrl;
+      archivoMime = registro.archivoMime || archivoMime;
+    } else {
+      responderJson(response, 400, { ok: false, message: 'Falta identificador de comprobante.' });
       return;
     }
 
-    const registro = await obtenerRegistroComprobante(id);
-    if (!registro?.blobUrl) {
-      responderJson(response, 404, { ok: false, message: 'Comprobante no encontrado.' });
-      return;
-    }
-
-    const descarga = await fetch(registro.blobUrl, {
+    const descarga = await fetch(blobUrl, {
       headers: {
         Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
       }
@@ -361,7 +382,7 @@ export async function handleRequest(request, response) {
 
     const buffer = Buffer.from(await descarga.arrayBuffer());
     response.writeHead(200, {
-      'Content-Type': registro.archivoMime || 'application/octet-stream',
+      'Content-Type': descarga.headers.get('content-type') || archivoMime,
       'Content-Length': buffer.length,
       'Cache-Control': 'private, max-age=120'
     });
