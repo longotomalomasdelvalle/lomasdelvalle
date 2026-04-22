@@ -31,9 +31,8 @@ function IconoEstado() {
 
 function FormularioComprobante({ vecino }) {
   const [archivo, setArchivo] = useState(null);
-  const [monto, setMonto] = useState('');
   const [fechaPago, setFechaPago] = useState('');
-  const [observacion, setObservacion] = useState('');
+  const [detalle, setDetalle] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
@@ -67,9 +66,8 @@ function FormularioComprobante({ vecino }) {
           nombre: vecino.nombre,
           parcela: vecino.parcela,
           sitio: vecino.sitio,
-          monto,
           fechaPago,
-          observacion,
+          observacion: detalle,
           archivoNombre: archivo.name,
           imagenDataUrl: optimizada.dataUrl
         })
@@ -87,9 +85,8 @@ function FormularioComprobante({ vecino }) {
 
       setMensaje(data.message || 'Comprobante enviado correctamente.');
       setArchivo(null);
-      setMonto('');
       setFechaPago('');
-      setObservacion('');
+      setDetalle('');
     } catch (submitError) {
       console.error('Error enviando comprobante', submitError);
       setError(submitError.message || 'No se pudo enviar el comprobante.');
@@ -109,25 +106,17 @@ function FormularioComprobante({ vecino }) {
           className="md:col-span-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
         />
         <input
-          type="text"
-          inputMode="numeric"
-          placeholder="Monto pagado (opcional)"
-          value={monto}
-          onChange={(event) => setMonto(event.target.value)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
-        />
-        <input
           type="date"
           value={fechaPago}
           onChange={(event) => setFechaPago(event.target.value)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 md:col-span-1"
         />
         <input
           type="text"
-          placeholder="Observacion (opcional)"
-          value={observacion}
-          onChange={(event) => setObservacion(event.target.value)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+          placeholder="Comentario o detalle (opcional)"
+          value={detalle}
+          onChange={(event) => setDetalle(event.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 md:col-span-2"
         />
       </div>
 

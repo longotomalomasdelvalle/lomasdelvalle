@@ -27,9 +27,8 @@ export async function enviarCorreoComprobante(payload) {
     <h2>Nuevo comprobante de pago</h2>
     <p><strong>Nombre:</strong> ${payload.nombre}</p>
     <p><strong>Parcela/Sitio:</strong> ${payload.parcela} / ${payload.sitio}</p>
-    <p><strong>Monto informado:</strong> ${payload.monto || 'No informado'}</p>
     <p><strong>Fecha de pago:</strong> ${payload.fechaPago || 'No informada'}</p>
-    <p><strong>Observacion:</strong> ${payload.observacion || 'Sin observacion'}</p>
+    <p><strong>Detalle/Comentario:</strong> ${payload.observacion || 'Sin detalle'}</p>
     <p><strong>Archivo:</strong> ${payload.archivoNombre} (${payload.archivoMime}, ${payload.archivoBytes} bytes)</p>
     <p><strong>Blob path:</strong> ${payload.blobPath}</p>
     <p><a href="${enlaceComprobante}" target="_blank" rel="noopener noreferrer">Abrir comprobante</a></p>
@@ -39,9 +38,8 @@ export async function enviarCorreoComprobante(payload) {
     'Nuevo comprobante de pago',
     `Nombre: ${payload.nombre}`,
     `Parcela/Sitio: ${payload.parcela} / ${payload.sitio}`,
-    `Monto informado: ${payload.monto || 'No informado'}`,
     `Fecha de pago: ${payload.fechaPago || 'No informada'}`,
-    `Observacion: ${payload.observacion || 'Sin observacion'}`,
+    `Detalle/Comentario: ${payload.observacion || 'Sin detalle'}`,
     `Archivo: ${payload.archivoNombre} (${payload.archivoMime}, ${payload.archivoBytes} bytes)`,
     `Blob path: ${payload.blobPath}`,
     `Enlace: ${enlaceComprobante}`
