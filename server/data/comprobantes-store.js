@@ -72,3 +72,13 @@ export async function guardarRegistroComprobante(registro) {
   await escribirRegistros(actualizado);
   return actualizado[0];
 }
+
+export async function obtenerRegistroComprobante(id) {
+  const idBuscado = String(id || '').trim();
+  if (!idBuscado) {
+    return null;
+  }
+
+  const registros = await leerRegistros();
+  return registros.find((item) => item.id === idBuscado) || null;
+}

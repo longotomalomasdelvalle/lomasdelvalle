@@ -10,7 +10,10 @@ import {
   guardarConfiguracionColumnas
 } from './data/config-store.js';
 import { escribirArchivoBlob, usaBlob } from './data/blob-store.js';
-import { guardarRegistroComprobante } from './data/comprobantes-store.js';
+import {
+  guardarRegistroComprobante,
+  obtenerRegistroComprobante
+} from './data/comprobantes-store.js';
 import { cargarFilasVecinos, guardarFilasVecinos } from './data/vecinos-store.js';
 import { parseCookies, serializarCookie } from './utils/cookies.js';
 import { enviarCorreoComprobante } from './utils/notificaciones.js';
@@ -226,7 +229,7 @@ function responderNoAutorizado(response) {
   });
 }
 
-async function procesarComprobantePago(body) {
+async function procesarComprobantePago(body, publicBaseUrl) {
   if (!usaBlob()) {
     throw new Error(
       'No hay almacenamiento Blob configurado. Define BLOB_READ_WRITE_TOKEN para recibir comprobantes.'
@@ -277,11 +280,13 @@ async function procesarComprobantePago(body) {
     blobUrl: blob.url,
     emailNotificado: false
   });
+  const enlacePublico = `${publicBaseUrl}/api/comprobantes/archivo?id=${encodeURIComponent(registro.id)}`;
 
   const notificacion = await enviarCorreoComprobante({
     ...registro,
     blobPath,
-    blobUrl: blob.url
+    blobUrl: blob.url,
+    enlacePublico
   });
 
   if (notificacion.ok) {
@@ -294,6 +299,7 @@ async function procesarComprobantePago(body) {
   return {
     id: registro.id,
     blobUrl: blob.url,
+    enlacePublico,
     blobPath,
     archivoBytes: bytes.length,
     emailEnviado: Boolean(notificacion.ok),
@@ -307,6 +313,9 @@ export async function handleRequest(request, response) {
   try {
     const host = request.headers.host || 'localhost';
     const url = new URL(request.url || '/', `http://${host}`);
+
+    const publicBaseUrl =
+      process.env.PUBLIC_APP_URL || `${process.env.VERCEL_URL ? 'https' : 'http'}://${host}`;
 
     if (request.method === 'GET' && url.pathname === '/api/health') {
       responderJson(response, 200, { ok: true });
@@ -326,10 +335,44 @@ export async function handleRequest(request, response) {
     return;
   }
 
+  if (request.method === 'GET' && url.pathname === '/api/comprobantes/archivo') {
+    const id = String(url.searchParams.get('id') || '').trim();
+    if (!id) {
+      responderJson(response, 400, { ok: false, message: 'Falta id de comprobante.' });
+      return;
+    }
+
+    const registro = await obtenerRegistroComprobante(id);
+    if (!registro?.blobUrl) {
+      responderJson(response, 404, { ok: false, message: 'Comprobante no encontrado.' });
+      return;
+    }
+
+    const descarga = await fetch(registro.blobUrl, {
+      headers: {
+        Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
+      }
+    });
+
+    if (!descarga.ok) {
+      responderJson(response, 404, { ok: false, message: 'No se pudo abrir el comprobante.' });
+      return;
+    }
+
+    const buffer = Buffer.from(await descarga.arrayBuffer());
+    response.writeHead(200, {
+      'Content-Type': registro.archivoMime || 'application/octet-stream',
+      'Content-Length': buffer.length,
+      'Cache-Control': 'private, max-age=120'
+    });
+    response.end(buffer);
+    return;
+  }
+
   if (request.method === 'POST' && url.pathname === '/api/comprobantes') {
     try {
       const body = await leerBody(request);
-      const resultado = await procesarComprobantePago(body);
+      const resultado = await procesarComprobantePago(body, publicBaseUrl);
       responderJson(response, 200, {
         ok: true,
         message: resultado.emailEnviado

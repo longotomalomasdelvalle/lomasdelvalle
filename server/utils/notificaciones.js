@@ -22,6 +22,7 @@ export async function enviarCorreoComprobante(payload) {
   }
 
   const subject = `Nuevo comprobante: ${payload.nombre} (${payload.parcela}/${payload.sitio})`;
+  const enlaceComprobante = payload.enlacePublico || payload.blobUrl;
   const html = `
     <h2>Nuevo comprobante de pago</h2>
     <p><strong>Nombre:</strong> ${payload.nombre}</p>
@@ -31,7 +32,7 @@ export async function enviarCorreoComprobante(payload) {
     <p><strong>Observacion:</strong> ${payload.observacion || 'Sin observacion'}</p>
     <p><strong>Archivo:</strong> ${payload.archivoNombre} (${payload.archivoMime}, ${payload.archivoBytes} bytes)</p>
     <p><strong>Blob path:</strong> ${payload.blobPath}</p>
-    <p><a href="${payload.blobUrl}" target="_blank" rel="noopener noreferrer">Abrir comprobante</a></p>
+    <p><a href="${enlaceComprobante}" target="_blank" rel="noopener noreferrer">Abrir comprobante</a></p>
   `;
 
   const text = [
@@ -43,7 +44,7 @@ export async function enviarCorreoComprobante(payload) {
     `Observacion: ${payload.observacion || 'Sin observacion'}`,
     `Archivo: ${payload.archivoNombre} (${payload.archivoMime}, ${payload.archivoBytes} bytes)`,
     `Blob path: ${payload.blobPath}`,
-    `Enlace: ${payload.blobUrl}`
+    `Enlace: ${enlaceComprobante}`
   ].join('\n');
 
   const response = await fetch('https://api.resend.com/emails', {
