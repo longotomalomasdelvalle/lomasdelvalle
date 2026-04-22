@@ -8,6 +8,16 @@ function accesoBlob() {
   return process.env.BLOB_ACCESS === 'public' ? 'public' : 'private';
 }
 
+function normalizarAccesoBlob(access) {
+  if (access === 'public') {
+    return 'public';
+  }
+  if (access === 'private') {
+    return 'private';
+  }
+  return accesoBlob();
+}
+
 async function buscarBlob(pathname) {
   const resultado = await list({
     prefix: pathname,
@@ -61,6 +71,19 @@ export async function escribirJsonBlob(pathname, data) {
 
   return true;
 
+}
+
+export async function escribirArchivoBlob(pathname, data, options = {}) {
+  if (!blobHabilitado()) {
+    return null;
+  }
+
+  return put(pathname, data, {
+    access: normalizarAccesoBlob(options.access),
+    addRandomSuffix: options.addRandomSuffix ?? false,
+    allowOverwrite: options.allowOverwrite ?? false,
+    contentType: options.contentType || 'application/octet-stream'
+  });
 }
 
 export function usaBlob() {

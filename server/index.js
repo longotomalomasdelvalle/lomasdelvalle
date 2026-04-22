@@ -9,8 +9,11 @@ import {
   cargarConfiguracionColumnas,
   guardarConfiguracionColumnas
 } from './data/config-store.js';
+import { escribirArchivoBlob, usaBlob } from './data/blob-store.js';
+import { guardarRegistroComprobante } from './data/comprobantes-store.js';
 import { cargarFilasVecinos, guardarFilasVecinos } from './data/vecinos-store.js';
 import { parseCookies, serializarCookie } from './utils/cookies.js';
+import { enviarCorreoComprobante } from './utils/notificaciones.js';
 import { crearSesion, eliminarSesion, obtenerSesion } from './utils/sessions.js';
 
 const PORT = Number(process.env.PORT || 8787);
@@ -21,6 +24,53 @@ const COOKIE_BASE = {
   path: '/',
   secure: process.env.NODE_ENV === 'production'
 };
+const TIPOS_IMAGEN_PERMITIDOS = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_BYTES_COMPROBANTE = Number(process.env.COMPROBANTE_MAX_BYTES || 1_000_000);
+
+function slug(texto) {
+  return String(texto || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function extensionPorMime(mime) {
+  if (mime === 'image/png') {
+    return 'png';
+  }
+  if (mime === 'image/webp') {
+    return 'webp';
+  }
+  return 'jpg';
+}
+
+function parseDataUrlImagen(dataUrl) {
+  const match = String(dataUrl || '').match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) {
+    throw new Error('Imagen invalida. Envia un archivo JPG, PNG o WebP.');
+  }
+
+  const mime = match[1].toLowerCase();
+  if (!TIPOS_IMAGEN_PERMITIDOS.has(mime)) {
+    throw new Error('Formato no permitido. Usa JPG, PNG o WebP.');
+  }
+
+  const bytes = Buffer.from(match[2], 'base64');
+  if (!bytes.length) {
+    throw new Error('La imagen esta vacia.');
+  }
+
+  if (bytes.length > MAX_BYTES_COMPROBANTE) {
+    throw new Error(
+      `La imagen supera el limite permitido (${Math.round(MAX_BYTES_COMPROBANTE / 1024)} KB).`
+    );
+  }
+
+  return { mime, bytes };
+}
 
 function parsearRepositorioGithub(valor) {
   const limpio = String(valor ?? '').trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '');
@@ -176,6 +226,83 @@ function responderNoAutorizado(response) {
   });
 }
 
+async function procesarComprobantePago(body) {
+  if (!usaBlob()) {
+    throw new Error(
+      'No hay almacenamiento Blob configurado. Define BLOB_READ_WRITE_TOKEN para recibir comprobantes.'
+    );
+  }
+
+  const nombre = String(body.nombre || '').trim();
+  const parcela = String(body.parcela || '').trim();
+  const sitio = String(body.sitio || '').trim();
+  const monto = String(body.monto || '').trim();
+  const fechaPago = String(body.fechaPago || '').trim();
+  const observacion = String(body.observacion || '').trim();
+  const archivoNombre = String(body.archivoNombre || 'comprobante').trim();
+
+  if (!nombre || !parcela || !sitio || !body.imagenDataUrl) {
+    throw new Error('Debes enviar nombre, parcela, sitio e imagen del comprobante.');
+  }
+
+  const { mime, bytes } = parseDataUrlImagen(body.imagenDataUrl);
+  const extension = extensionPorMime(mime);
+  const fecha = new Date();
+  const nombreSeguro = slug(nombre) || 'vecino';
+  const identificador = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const blobPath = `lomas/comprobantes/${fecha.getUTCFullYear()}/${String(fecha.getUTCMonth() + 1).padStart(2, '0')}/${identificador}-${nombreSeguro}.${extension}`;
+
+  const blob = await escribirArchivoBlob(blobPath, bytes, {
+    contentType: mime,
+    access: process.env.COMPROBANTE_BLOB_ACCESS || process.env.BLOB_ACCESS || 'private'
+  });
+
+  if (!blob?.url) {
+    throw new Error('No se pudo guardar el comprobante en Blob.');
+  }
+
+  const registro = await guardarRegistroComprobante({
+    id: identificador,
+    creadoEn: fecha.toISOString(),
+    nombre,
+    parcela,
+    sitio,
+    monto,
+    fechaPago,
+    observacion,
+    archivoNombre,
+    archivoMime: mime,
+    archivoBytes: bytes.length,
+    blobPath,
+    blobUrl: blob.url,
+    emailNotificado: false
+  });
+
+  const notificacion = await enviarCorreoComprobante({
+    ...registro,
+    blobPath,
+    blobUrl: blob.url
+  });
+
+  if (notificacion.ok) {
+    await guardarRegistroComprobante({
+      ...registro,
+      emailNotificado: true
+    });
+  }
+
+  return {
+    id: registro.id,
+    blobUrl: blob.url,
+    blobPath,
+    archivoBytes: bytes.length,
+    emailEnviado: Boolean(notificacion.ok),
+    emailMensaje: notificacion.ok
+      ? 'Correo enviado.'
+      : notificacion.message || 'Comprobante guardado, pero el correo no se pudo enviar.'
+  };
+}
+
 export async function handleRequest(request, response) {
   try {
     const host = request.headers.host || 'localhost';
@@ -196,6 +323,26 @@ export async function handleRequest(request, response) {
       filas,
       configuracion
     });
+    return;
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/comprobantes') {
+    try {
+      const body = await leerBody(request);
+      const resultado = await procesarComprobantePago(body);
+      responderJson(response, 200, {
+        ok: true,
+        message: resultado.emailEnviado
+          ? 'Comprobante recibido y notificado por correo.'
+          : 'Comprobante recibido. El correo no se pudo enviar.',
+        ...resultado
+      });
+    } catch (error) {
+      responderJson(response, 400, {
+        ok: false,
+        message: error.message || 'No se pudo procesar el comprobante.'
+      });
+    }
     return;
   }
 

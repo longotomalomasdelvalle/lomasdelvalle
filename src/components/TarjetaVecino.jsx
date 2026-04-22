@@ -1,3 +1,8 @@
+import { useState } from 'react';
+import { optimizarComprobante } from '../utils/comprobantes.js';
+
+const MAX_COMPROBANTE_BYTES = 1_000_000;
+
 function IconoMoneda() {
   return (
     <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
@@ -21,6 +26,125 @@ function IconoEstado() {
     <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
       <path d="M4.5 10L8 13.5L15.5 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+function FormularioComprobante({ vecino }) {
+  const [archivo, setArchivo] = useState(null);
+  const [monto, setMonto] = useState('');
+  const [fechaPago, setFechaPago] = useState('');
+  const [observacion, setObservacion] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [mensaje, setMensaje] = useState('');
+  const [error, setError] = useState('');
+  const [tamanoOptimizadoKb, setTamanoOptimizadoKb] = useState(null);
+
+  async function enviarComprobante(event) {
+    event.preventDefault();
+    if (!archivo) {
+      setError('Selecciona una imagen de comprobante.');
+      setMensaje('');
+      return;
+    }
+
+    try {
+      setEnviando(true);
+      setError('');
+      setMensaje('');
+
+      const optimizada = await optimizarComprobante(archivo, {
+        maxBytes: MAX_COMPROBANTE_BYTES,
+        maxDimension: 1400
+      });
+      setTamanoOptimizadoKb(Math.round(optimizada.bytes / 1024));
+
+      const response = await fetch('/api/comprobantes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          nombre: vecino.nombre,
+          parcela: vecino.parcela,
+          sitio: vecino.sitio,
+          monto,
+          fechaPago,
+          observacion,
+          archivoNombre: archivo.name,
+          imagenDataUrl: optimizada.dataUrl
+        })
+      });
+
+      const data = await response.json().catch(() => ({
+        ok: false,
+        message: 'Respuesta invalida del servidor.'
+      }));
+
+      if (!response.ok || !data.ok) {
+        setError(data.message || 'No se pudo enviar el comprobante.');
+        return;
+      }
+
+      setMensaje(data.message || 'Comprobante enviado correctamente.');
+      setArchivo(null);
+      setMonto('');
+      setFechaPago('');
+      setObservacion('');
+    } catch (submitError) {
+      console.error('Error enviando comprobante', submitError);
+      setError(submitError.message || 'No se pudo enviar el comprobante.');
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <form onSubmit={enviarComprobante} className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs text-slate-600 font-medium mb-3">Adjuntar comprobante de pago (imagen)</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={(event) => setArchivo(event.target.files?.[0] || null)}
+          className="md:col-span-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+        />
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="Monto pagado (opcional)"
+          value={monto}
+          onChange={(event) => setMonto(event.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+        />
+        <input
+          type="date"
+          value={fechaPago}
+          onChange={(event) => setFechaPago(event.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+        />
+        <input
+          type="text"
+          placeholder="Observacion (opcional)"
+          value={observacion}
+          onChange={(event) => setObservacion(event.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+        />
+      </div>
+
+      {tamanoOptimizadoKb !== null ? (
+        <p className="mt-2 text-xs text-slate-500">Tamano optimizado aprox: {tamanoOptimizadoKb} KB</p>
+      ) : null}
+      {mensaje ? <p className="mt-2 text-xs text-emerald-700">{mensaje}</p> : null}
+      {error ? <p className="mt-2 text-xs text-red-700">{error}</p> : null}
+
+      <button
+        type="submit"
+        disabled={enviando}
+        className="mt-3 inline-flex items-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-60"
+      >
+        {enviando ? 'Enviando...' : 'Enviar comprobante'}
+      </button>
+    </form>
   );
 }
 
@@ -197,6 +321,8 @@ export default function TarjetaVecino({ vecino }) {
               <span className="text-sm text-emerald-600 font-medium">No tiene meses pendientes</span>
             )}
           </div>
+
+          <FormularioComprobante vecino={vecino} />
         </div>
       </div>
     </div>

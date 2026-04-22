@@ -1,16 +1,40 @@
-# React + Vite
+# Lomas del Valle - Portal de Pagos
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Portal publico para consulta de estado de pagos y panel de administracion para gestion de planilla.
 
-Currently, two official plugins are available:
+## Comprobantes de pago (Blob + correo)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Se implemento flujo para que cada socio adjunte su comprobante en imagen desde la tarjeta publica.
 
-## React Compiler
+### Flujo
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. El socio adjunta una imagen (`JPG/PNG/WebP`) desde su tarjeta.
+2. El navegador optimiza la imagen (resize + compresion) antes de subirla.
+3. El backend valida tamano/formato y guarda el archivo en Vercel Blob.
+4. El backend registra metadatos del comprobante.
+5. Se envia un correo interno con link al archivo en Blob.
 
-## Expanding the ESLint configuration
+### Variables de entorno necesarias
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Configura estas variables en local y en Vercel:
+
+- `BLOB_READ_WRITE_TOKEN`
+- `BLOB_ACCESS=private`
+- `COMPROBANTE_BLOB_ACCESS=private`
+- `COMPROBANTE_MAX_BYTES=1000000`
+- `RESEND_API_KEY`
+- `COMPROBANTE_EMAIL_FROM` (ejemplo: `Pagos Lomas <pagos@tu-dominio.com>`)
+- `COMPROBANTE_EMAIL_TO` (correo interno que recibe avisos)
+
+### Probar rapido
+
+1. Ejecuta backend y frontend:
+   - `npm run dev:server`
+   - `npm run dev:client`
+2. Abre la vista publica, filtra un vecino y adjunta un comprobante.
+3. Verifica:
+   - mensaje de exito en la UI
+   - archivo en Blob
+   - correo recibido en `COMPROBANTE_EMAIL_TO`
+
+Si falta configuracion de correo, el comprobante igual se guarda y se informa el motivo en la respuesta.
