@@ -287,9 +287,12 @@ async function procesarComprobantePago(body, publicBaseUrl) {
     archivoBytes: bytes.length,
     blobPath,
     blobUrl: blob.url,
+    blobDownloadUrl: blob.downloadUrl || '',
     emailNotificado: false
   });
-  const enlacePublico = `${publicBaseUrl}/api/comprobantes/archivo?u=${encodeURIComponent(blob.url)}`;
+  const enlacePublico =
+    blob.downloadUrl ||
+    `${publicBaseUrl}/api/comprobantes/archivo?u=${encodeURIComponent(blob.url)}`;
 
   const notificacion = await enviarCorreoComprobante({
     ...registro,
@@ -362,18 +365,17 @@ export async function handleRequest(request, response) {
         responderJson(response, 404, { ok: false, message: 'Comprobante no encontrado.' });
         return;
       }
-      blobUrl = registro.blobUrl;
+      blobUrl = registro.blobDownloadUrl || registro.blobUrl;
       archivoMime = registro.archivoMime || archivoMime;
     } else {
       responderJson(response, 400, { ok: false, message: 'Falta identificador de comprobante.' });
       return;
     }
 
-    const descarga = await fetch(blobUrl, {
-      headers: {
-        Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
-      }
-    });
+    const headers = blobUrl.includes('.private.blob.vercel-storage.com')
+      ? { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` }
+      : {};
+    const descarga = await fetch(blobUrl, { headers });
 
     if (!descarga.ok) {
       responderJson(response, 404, { ok: false, message: 'No se pudo abrir el comprobante.' });

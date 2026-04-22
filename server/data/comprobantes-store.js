@@ -26,6 +26,7 @@ function normalizarRegistro(registro = {}) {
     archivoBytes: Number(registro.archivoBytes || 0),
     blobPath: String(registro.blobPath || '').trim(),
     blobUrl: String(registro.blobUrl || '').trim(),
+    blobDownloadUrl: String(registro.blobDownloadUrl || '').trim(),
     emailNotificado: Boolean(registro.emailNotificado)
   };
 }
