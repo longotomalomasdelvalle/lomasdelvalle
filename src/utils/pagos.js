@@ -201,10 +201,12 @@ export function crearVecino(fila, index, configuracion = CONFIGURACION_COLUMNAS_
   const nombreBase = String(
     fila['NOMBRE DE PROPIETARIO'] || fila.PROPIETARIO || `Vecino ${index + 1}`
   ).trim();
+  const nombreNormalizado = normalizarNombrePropietario(nombreBase);
 
   return {
     id: index + 1,
-    nombre: normalizarNombrePropietario(nombreBase),
+    nombre: nombreNormalizado,
+    nombreBusqueda: normalizarTexto(nombreNormalizado),
     rut: String(obtenerValorCampo(fila, ['RUT', 'R']) ?? '').trim(),
     contacto: String(
       obtenerValorCampo(fila, ['N-CONTACTO', 'N_CONTACTO', 'NUMERO DE CONTACTO', 'CONTACTO']) ?? ''

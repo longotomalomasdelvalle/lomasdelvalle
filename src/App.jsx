@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import EstadoCarga from './components/EstadoCarga';
 import AdminAnalytics from './components/AdminAnalytics';
 import AdminVecinosGrid from './components/AdminVecinosGrid';
@@ -120,11 +120,18 @@ export default function PortalPagosPasaje() {
     }
   }
 
-  const { hayFiltrosActivos, vecinosFiltrados } = filtrarVecinos(vecinos, {
-    filtroParcela,
-    filtroSitio,
-    filtroNombre
-  });
+  const filtroNombreDiferido = useDeferredValue(filtroNombre);
+  const filtroParcelaDiferido = useDeferredValue(filtroParcela);
+  const filtroSitioDiferido = useDeferredValue(filtroSitio);
+  const { hayFiltrosActivos, vecinosFiltrados } = useMemo(
+    () =>
+      filtrarVecinos(vecinos, {
+        filtroParcela: filtroParcelaDiferido,
+        filtroSitio: filtroSitioDiferido,
+        filtroNombre: filtroNombreDiferido
+      }),
+    [vecinos, filtroNombreDiferido, filtroParcelaDiferido, filtroSitioDiferido]
+  );
 
   const tituloCabecera = logueado
     ? 'Administracion Lomas del Valle Longotoma'

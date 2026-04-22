@@ -2,9 +2,13 @@ import { normalizarTexto } from './pagos.js';
 
 export function filtrarVecinos(vecinos, filtros) {
   const { filtroParcela, filtroSitio, filtroNombre } = filtros;
+  const parcelaBuscada = filtroParcela.trim();
+  const sitioBuscado = filtroSitio.trim();
+  const filtroNombreNormalizado = normalizarTexto(filtroNombre);
+  const partesNombreBuscadas = filtroNombreNormalizado.split(' ').filter(Boolean);
 
   const hayFiltrosActivos =
-    filtroParcela.trim() !== '' || filtroSitio.trim() !== '' || filtroNombre.trim() !== '';
+    parcelaBuscada !== '' || sitioBuscado !== '' || filtroNombre.trim() !== '';
 
   if (!hayFiltrosActivos) {
     return {
@@ -13,16 +17,13 @@ export function filtrarVecinos(vecinos, filtros) {
     };
   }
 
-  const filtroNombreNormalizado = normalizarTexto(filtroNombre);
-
   const vecinosFiltrados = vecinos.filter((vecino) => {
-    const coincideParcela = filtroParcela ? vecino.parcela.includes(filtroParcela.trim()) : true;
-    const coincideSitio = filtroSitio ? vecino.sitio.includes(filtroSitio.trim()) : true;
-    const coincideNombre = filtroNombreNormalizado
-      ? filtroNombreNormalizado
-          .split(' ')
-          .filter(Boolean)
-          .every((parte) => normalizarTexto(vecino.nombre).includes(parte))
+    const coincideParcela = parcelaBuscada ? vecino.parcela.includes(parcelaBuscada) : true;
+    const coincideSitio = sitioBuscado ? vecino.sitio.includes(sitioBuscado) : true;
+    const coincideNombre = partesNombreBuscadas.length > 0
+      ? partesNombreBuscadas.every((parte) =>
+          String(vecino.nombreBusqueda || normalizarTexto(vecino.nombre)).includes(parte)
+        )
       : true;
 
     return coincideParcela && coincideSitio && coincideNombre;
