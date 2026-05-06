@@ -12,7 +12,7 @@ import {
   formatearRutEditable,
   normalizarFilaEditable
 } from '../utils/adminRows.js';
-import { exportarFilasAExcel, exportarFilasAJson } from '../utils/exportadores.js';
+import { exportarFilasAJson } from '../utils/exportadores.js';
 
 async function leerRespuestaJson(response) {
   try {
@@ -66,6 +66,18 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
     cargarFilas();
   }, [logueado]);
 
+  useEffect(() => {
+    if (!mensaje) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setMensaje('');
+    }, 2800);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [mensaje]);
+
   async function cargarFilas() {
     try {
       setCargando(true);
@@ -99,6 +111,7 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
   }
 
   function actualizarCelda(index, campo, valor, opciones = {}) {
+    setMensaje('');
     if (index === -1 && campo === '__add_column__') {
       const nombreColumna = normalizarNombreColumna(valor);
 
@@ -185,16 +198,21 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
   }
 
   function agregarFila() {
+    setMensaje('');
+    setError('');
     setFilas((actuales) => [...actuales, marcarFilaActualizada(crearFilaEditable(configuracion))]);
     setFilasModificadas([]);
   }
 
   function eliminarFila(index) {
+    setMensaje('');
+    setError('');
     setFilas((actuales) => actuales.filter((_, filaIndex) => filaIndex !== index));
     setFilasModificadas((actuales) => actuales.filter((filaIndex) => filaIndex !== index));
   }
 
   function reemplazarFila(index, fila) {
+    setMensaje('');
     setFilas((actuales) =>
       actuales.map((actual, filaIndex) => (filaIndex === index ? fila : actual))
     );
@@ -328,11 +346,34 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
       }
 
       const filasImportadasCrudas = XLSX.utils.sheet_to_json(worksheet);
+      const filasCrudasFiltradas = filasImportadasCrudas.filter((fila) => {
+        const nombre = String(fila['NOMBRE DE PROPIETARIO'] ?? fila.PROPIETARIO ?? '').trim();
+        const rut = String(fila.RUT ?? fila.R ?? fila.RODERA ?? '').trim();
+        const contacto = String(
+          fila['N-CONTACTO'] ?? fila.N_CONTACTO ?? fila['N¬CONTACTO'] ?? fila.CONTACTO ?? ''
+        ).trim();
+        const parcela = String(fila.PARCELA ?? '').trim();
+        const sitio = String(fila.SITIO ?? '').trim();
+        const parcst = String(fila['PARC/ST'] ?? '').trim();
+        const metrica = String(fila.METRICA ?? fila.CATEGORIA ?? fila.TITULO ?? '').trim();
+        const tieneIdentificacion =
+          Boolean(nombre || rut || contacto || parcst) ||
+          (Boolean(parcela && parcela !== '-') || Boolean(sitio && sitio !== '-'));
+
+        return tieneIdentificacion && !metrica;
+      });
+
+      if (!filasCrudasFiltradas.length) {
+        setError(
+          'El Excel no contiene filas de vecinos validas. Parece una planilla de analitica/resumen.'
+        );
+        return false;
+      }
       const configuracionImportada = normalizarConfiguracionColumnas(
         configuracion,
-        filasImportadasCrudas
+        filasCrudasFiltradas
       );
-      const filasImportadas = filasImportadasCrudas.map((fila) =>
+      const filasImportadas = filasCrudasFiltradas.map((fila) =>
         marcarFilaActualizada(normalizarFilaEditable(fila, configuracionImportada))
       );
 
@@ -380,10 +421,89 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
     }
   }
 
-  function exportarExcel() {
-    exportarFilasAExcel(filas);
-    setMensaje('Excel exportado correctamente.');
-    setError('');
+  async function limpiarPlanilla() {
+    try {
+      setGuardando(true);
+      setError('');
+      setMensaje('');
+
+      const response = await fetch('/api/admin/vecinos/reset', {
+        method: 'POST',
+        credentials: 'same-origin'
+      });
+      const data = await leerRespuestaJson(response);
+
+      if (!response.ok || !data.ok) {
+        setError(data.message || mensajeErrorHttp(response, 'No se pudo limpiar la planilla.'));
+        return false;
+      }
+
+      const configuracionNormalizada = normalizarConfiguracionColumnas(
+        data.configuracion,
+        data.filas
+      );
+      setConfiguracion(configuracionNormalizada);
+      setFilas([]);
+      setFilasModificadas([]);
+      setMensaje(data.message || 'Planilla limpiada correctamente.');
+      await onPersistSuccess?.();
+      return true;
+    } catch (fetchError) {
+      console.error('Error limpiando planilla', fetchError);
+      setError('No se pudo limpiar la planilla.');
+      return false;
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function exportarExcel() {
+    try {
+      setGuardando(true);
+      setError('');
+      setMensaje('');
+
+      const response = await fetch('/api/admin/vecinos/export/excel', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          filas,
+          configuracion
+        })
+      });
+
+      if (!response.ok) {
+        const data = await leerRespuestaJson(response);
+        setError(
+          data.message || mensajeErrorHttp(response, 'No se pudo exportar el Excel con formato base.')
+        );
+        return false;
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get('content-disposition') || '';
+      const nombreMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
+      const nombreArchivo = nombreMatch?.[1] || 'vecinos-exportados.xlsx';
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = nombreArchivo;
+      link.click();
+      window.URL.revokeObjectURL(url);
+
+      setMensaje('Excel exportado correctamente con formato base.');
+      setError('');
+      return true;
+    } catch (fetchError) {
+      console.error('Error exportando Excel con plantilla', fetchError);
+      setError('No se pudo exportar el Excel con formato base.');
+      return false;
+    } finally {
+      setGuardando(false);
+    }
   }
 
   function exportarJson() {
@@ -430,6 +550,15 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
     }
   }
 
+  async function respaldarYBorrarPlanilla() {
+    const respaldoOk = await respaldarGithub();
+    if (!respaldoOk) {
+      return false;
+    }
+
+    return limpiarPlanilla();
+  }
+
   return {
     filas,
     configuracion,
@@ -449,6 +578,7 @@ export default function useAdminVecinos(logueado, onPersistSuccess) {
     exportarExcel,
     exportarJson,
     respaldarGithub,
+    respaldarYBorrarPlanilla,
     recargar: cargarFilas
   };
 }

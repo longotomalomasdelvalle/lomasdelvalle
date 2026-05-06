@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { TODOS_LOS_MESES } from '../constants/pagos.js';
 import {
   formatearContactoEditable,
@@ -11,25 +11,7 @@ import {
 import { COLUMNA_ACTUALIZACION } from '../utils/columnas.js';
 import { normalizarTexto } from '../utils/pagos.js';
 
-const FILAS_POR_PAGINA = 10;
-
-function formatearFechaRespaldo(iso) {
-  if (!iso) return '-';
-  const fecha = new Date(iso);
-  if (Number.isNaN(fecha.getTime())) return String(iso);
-  return fecha.toLocaleString('es-CL', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-}
-
-function abreviarCommit(sha) {
-  const valor = String(sha ?? '').trim();
-  return valor ? valor.slice(0, 8) : '-';
-}
+const FILAS_POR_PAGINA = 7;
 
 function esCampoMonetario(columna, columnasCuotaExtra) {
   return TODOS_LOS_MESES.includes(columna) || columnasCuotaExtra.includes(columna);
@@ -208,14 +190,6 @@ function IconoJson() {
     <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
       <path d="M7.083 4.583C5.926 4.583 5 5.51 5 6.667V8.333C5 9.023 4.44 9.583 3.75 9.583C4.44 9.583 5 10.143 5 10.833V12.5C5 13.657 5.926 14.583 7.083 14.583" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       <path d="M12.917 4.583C14.074 4.583 15 5.51 15 6.667V8.333C15 9.023 15.56 9.583 16.25 9.583C15.56 9.583 15 10.143 15 10.833V12.5C15 13.657 14.074 14.583 12.917 14.583" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconoGithub() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
-      <path d="M10 2.917C5.857 2.917 2.5 6.273 2.5 10.417C2.5 13.733 4.65 16.543 7.63 17.535C8.005 17.606 8.143 17.371 8.143 17.169V15.94C6.05 16.392 5.61 14.982 5.61 14.982C5.268 14.113 4.774 13.883 4.774 13.883C4.09 13.417 4.826 13.426 4.826 13.426C5.583 13.479 5.982 14.203 5.982 14.203C6.654 15.351 7.746 15.02 8.179 14.828C8.247 14.34 8.442 14.008 8.658 13.82C6.985 13.629 5.225 12.983 5.225 10.098C5.225 9.275 5.519 8.602 6.001 8.073C5.923 7.881 5.664 7.108 6.074 6.063C6.074 6.063 6.705 5.862 8.14 6.833C8.739 6.667 9.383 6.584 10.026 6.581C10.669 6.584 11.313 6.667 11.912 6.833C13.347 5.862 13.978 6.063 13.978 6.063C14.388 7.108 14.129 7.881 14.051 8.073C14.533 8.602 14.827 9.275 14.827 10.098C14.827 12.991 13.064 13.626 11.384 13.813C11.655 14.047 11.898 14.509 11.898 15.218V17.169C11.898 17.373 12.037 17.61 12.417 17.534C15.395 16.54 17.5 13.731 17.5 10.417C17.5 6.273 14.143 2.917 10 2.917Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -467,8 +441,7 @@ export default function AdminVecinosGrid({
   onImportExcel,
   onExportExcel,
   onExportJson,
-  onBackupGithub,
-  ultimoRespaldoGithub
+  onBackupAndReset
 }) {
   const [filtros, setFiltros] = useState({
     nombre: '',
@@ -484,6 +457,10 @@ export default function AdminVecinosGrid({
   const [mostrarCamposTransversales, setMostrarCamposTransversales] = useState(false);
   const [mensajeFila, setMensajeFila] = useState('');
   const [respaldandoGithub, setRespaldandoGithub] = useState(false);
+  const [filaRecienCreada, setFilaRecienCreada] = useState(null);
+  const [filaRecienGuardada, setFilaRecienGuardada] = useState(null);
+  const largoPrevioFilasRef = useRef(filas.length);
+  const autoEditarNuevaFilaRef = useRef(false);
 
   useEffect(() => {
     if (!mensajeFila) {
@@ -497,6 +474,64 @@ export default function AdminVecinosGrid({
     return () => window.clearTimeout(timeoutId);
   }, [mensajeFila]);
 
+  useEffect(() => {
+    if (filaRecienCreada === null) {
+      return undefined;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setFilaRecienCreada(null);
+    }, 2200);
+    return () => window.clearTimeout(timeoutId);
+  }, [filaRecienCreada]);
+
+  useEffect(() => {
+    if (filaRecienGuardada === null) {
+      return undefined;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setFilaRecienGuardada(null);
+    }, 2600);
+    return () => window.clearTimeout(timeoutId);
+  }, [filaRecienGuardada]);
+
+  useEffect(() => {
+    if (filaRecienGuardada === null) {
+      return;
+    }
+    const selector = `[data-fila-index="${filaRecienGuardada}"]`;
+    const filaElemento = document.querySelector(selector);
+    if (filaElemento) {
+      filaElemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [filaRecienGuardada]);
+
+  useEffect(() => {
+    const largoPrevio = largoPrevioFilasRef.current;
+    if (filas.length > largoPrevio && autoEditarNuevaFilaRef.current) {
+      setPaginaActual(1);
+      const filaMasReciente = filas
+        .map((fila, indiceOriginal) => ({ fila, indiceOriginal }))
+        .sort(
+          (itemA, itemB) =>
+            obtenerOrdenActualizacion(itemB.fila, itemB.indiceOriginal) -
+            obtenerOrdenActualizacion(itemA.fila, itemA.indiceOriginal)
+        )[0];
+
+      if (filaMasReciente) {
+        setFilaRecienCreada(filaMasReciente.indiceOriginal);
+        setMensajeFila('Fila nueva lista para editar.');
+        iniciarEdicion(filaMasReciente.indiceOriginal, filaMasReciente.fila);
+      }
+      autoEditarNuevaFilaRef.current = false;
+    }
+    largoPrevioFilasRef.current = filas.length;
+  }, [filas]);
+
+  function agregarFilaYEditar() {
+    autoEditarNuevaFilaRef.current = true;
+    onAddRow();
+  }
+
   function iniciarEdicion(index, fila) {
     if (filaSeleccionada !== index) {
       setRespaldoFila({ index, fila: { ...fila } });
@@ -505,14 +540,21 @@ export default function AdminVecinosGrid({
   }
 
   async function confirmarEdicion() {
+    // Da un frame para consolidar el ultimo onChange antes de persistir.
+    await new Promise((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
     const textoExito = 'Fila actualizada con exito.';
     const guardado = await onSave(textoExito);
 
     if (guardado) {
+      if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      setFilaRecienGuardada(filaSeleccionada);
       setFilaSeleccionada(null);
       setRespaldoFila(null);
-      setMensajeFila(textoExito);
-      window.alert(textoExito);
+      setMensajeFila('Guardado correctamente.');
     }
   }
 
@@ -524,13 +566,18 @@ export default function AdminVecinosGrid({
     setRespaldoFila(null);
   }
 
-  async function respaldarEnGithub() {
-    if (!onBackupGithub) return;
+  async function respaldarYBorrar() {
+    if (!onBackupAndReset) return;
+    const confirmar = window.confirm(
+      'Esto respaldara en GitHub y luego borrara toda la planilla cargada para dejarla en cero. Deseas continuar?'
+    );
+    if (!confirmar) return;
+
     setRespaldandoGithub(true);
     try {
-      const ok = await onBackupGithub();
+      const ok = await onBackupAndReset();
       if (ok) {
-        window.alert('Respaldo enviado a GitHub correctamente.');
+        window.alert('Respaldo completado y planilla borrada correctamente.');
       }
     } finally {
       setRespaldandoGithub(false);
@@ -608,126 +655,111 @@ export default function AdminVecinosGrid({
   const filasPagina = filasFiltradas.slice(inicio, inicio + FILAS_POR_PAGINA);
 
   return (
-    <div className="bg-white rounded-[2rem] shadow-xl p-4 md:p-6 space-y-4">
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-xl md:text-2xl font-bold text-slate-900">Gestion de planilla</h2>
-          <p className="text-sm md:text-base text-slate-600 mt-1">
-            Importa, edita y exporta la planilla. El respaldo a GitHub se hace solo cuando presionas el boton.
-          </p>
+    <div className="bg-white rounded-[1.5rem] shadow-lg border border-slate-200 p-3 md:p-4 xl:p-5 space-y-3 md:space-y-4">
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg md:text-xl font-bold text-slate-900">Gestion de planilla</h2>
+            <p className="text-xs md:text-sm text-slate-600 mt-0.5">
+              Importa, edita y exporta la planilla en un formato limpio y compacto.
+            </p>
+          </div>
         </div>
 
         <p className="text-[11px] md:text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
           Acciones principales
         </p>
-        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-3">
-          <label className="inline-flex items-center justify-center gap-2 bg-slate-100 text-slate-800 px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-xs md:text-sm font-semibold cursor-pointer hover:bg-slate-200 transition text-center">
-            <IconoImportar />
-            <span>Importar Excel</span>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              disabled={guardando}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) {
-                  onImportExcel(file);
-                }
-                event.target.value = '';
-              }}
-            />
-          </label>
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-start gap-2">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Edicion
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={agregarFilaYEditar}
+                  disabled={guardando}
+                  className="inline-flex items-center justify-center gap-1.5 bg-emerald-600 text-white px-2 py-1.5 md:px-2.5 md:py-1.5 rounded-lg text-[10px] md:text-[11px] font-semibold hover:bg-emerald-700 transition"
+                >
+                  <IconoAgregar />
+                  <span>Agregar fila</span>
+                </button>
 
-          <button
-            onClick={onAddRow}
-            disabled={guardando}
-            className="inline-flex items-center justify-center gap-2 bg-emerald-600 text-white px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-xs md:text-sm font-semibold hover:bg-emerald-700 transition"
-          >
-            <IconoAgregar />
-            <span>Agregar fila</span>
-          </button>
+                <BotonGestion
+                  abierta={mostrarCuotasExtra}
+                  etiquetaAbierta="Ocultar cuotas"
+                  etiquetaCerrada="Cuotas extra"
+                  onClick={() => setMostrarCuotasExtra((valorActual) => !valorActual)}
+                  className="bg-violet-600 text-white px-2 py-1.5 md:px-2.5 md:py-1.5 rounded-lg text-[10px] md:text-[11px] font-semibold hover:bg-violet-700 transition"
+                />
 
-          <BotonGestion
-            abierta={mostrarCuotasExtra}
-            etiquetaAbierta="Ocultar cuotas"
-            etiquetaCerrada="Cuotas extra"
-            onClick={() => setMostrarCuotasExtra((valorActual) => !valorActual)}
-            className="bg-violet-600 text-white px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-xs md:text-sm font-semibold hover:bg-violet-700 transition"
-          />
+                <BotonGestion
+                  abierta={mostrarCamposTransversales}
+                  etiquetaAbierta="Ocultar campos"
+                  etiquetaCerrada="Campos extra"
+                  onClick={() => setMostrarCamposTransversales((valorActual) => !valorActual)}
+                  className="bg-cyan-600 text-white px-2 py-1.5 md:px-2.5 md:py-1.5 rounded-lg text-[10px] md:text-[11px] font-semibold hover:bg-cyan-700 transition"
+                />
+              </div>
+            </div>
 
-          <BotonGestion
-            abierta={mostrarCamposTransversales}
-            etiquetaAbierta="Ocultar campos"
-            etiquetaCerrada="Campos extra"
-            onClick={() => setMostrarCamposTransversales((valorActual) => !valorActual)}
-            className="bg-cyan-600 text-white px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-xs md:text-sm font-semibold hover:bg-cyan-700 transition"
-          />
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Importar / Exportar
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                <label className="inline-flex items-center justify-center gap-1.5 bg-slate-100 text-slate-800 px-2 py-1.5 md:px-2.5 md:py-1.5 rounded-lg text-[10px] md:text-[11px] font-semibold cursor-pointer hover:bg-slate-200 transition text-center border border-slate-200">
+                  <IconoImportar />
+                  <span>Importar Excel</span>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    disabled={guardando}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) {
+                        const confirmar = window.confirm(
+                          'Se reemplazara la planilla actual con el Excel seleccionado. Deseas continuar?'
+                        );
+                        if (confirmar) {
+                          onImportExcel(file);
+                        }
+                      }
+                      event.target.value = '';
+                    }}
+                  />
+                </label>
 
-          <button
-            onClick={onExportExcel}
-            disabled={guardando || cargando || filas.length === 0}
-            className="inline-flex items-center justify-center gap-2 bg-amber-500 text-white px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-xs md:text-sm font-semibold hover:bg-amber-600 transition"
-          >
-            <IconoExcel />
-            <span>Exportar Excel</span>
-          </button>
+                <button
+                  onClick={onExportExcel}
+                  disabled={guardando || cargando || filas.length === 0}
+                  className="inline-flex items-center justify-center gap-1.5 bg-amber-500 text-white px-2 py-1.5 md:px-2.5 md:py-1.5 rounded-lg text-[10px] md:text-[11px] font-semibold hover:bg-amber-600 transition"
+                >
+                  <IconoExcel />
+                  <span>Exportar Excel</span>
+                </button>
 
-          <button
-            onClick={onExportJson}
-            disabled={guardando || cargando || filas.length === 0}
-            className="inline-flex items-center justify-center gap-2 bg-sky-600 text-white px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-xs md:text-sm font-semibold hover:bg-sky-700 transition"
-          >
-            <IconoJson />
-            <span>Descargar JSON</span>
-          </button>
+                <button
+                  onClick={onExportJson}
+                  disabled={guardando || cargando || filas.length === 0}
+                  className="inline-flex items-center justify-center gap-1.5 bg-sky-600 text-white px-2 py-1.5 md:px-2.5 md:py-1.5 rounded-lg text-[10px] md:text-[11px] font-semibold hover:bg-sky-700 transition"
+                >
+                  <IconoJson />
+                  <span>Descargar JSON</span>
+                </button>
 
-          <button
-            onClick={respaldarEnGithub}
-            disabled={guardando || cargando || respaldandoGithub}
-            className="col-span-2 md:col-span-1 inline-flex items-center justify-center gap-2 bg-slate-900 text-white px-3 py-3 md:px-4 md:py-3 rounded-2xl text-xs md:text-sm font-semibold hover:bg-slate-700 transition disabled:opacity-60"
-          >
-            <IconoGithub />
-            <span>{respaldandoGithub ? 'Respaldando...' : 'Respaldar en GitHub'}</span>
-          </button>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 md:px-4">
-          <p className="text-[11px] md:text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Ultimo respaldo GitHub
-          </p>
-          <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-1.5 text-xs md:text-sm text-slate-700">
-            <p>
-              <span className="font-semibold text-slate-500">Fecha:</span>{' '}
-              {formatearFechaRespaldo(ultimoRespaldoGithub?.generadoEn)}
-            </p>
-            <p>
-              <span className="font-semibold text-slate-500">Commit:</span>{' '}
-              {abreviarCommit(ultimoRespaldoGithub?.commitSha)}
-            </p>
-            <p>
-              <span className="font-semibold text-slate-500">Repo:</span>{' '}
-              {ultimoRespaldoGithub?.repo || '-'}
-            </p>
-            <p>
-              <span className="font-semibold text-slate-500">Branch:</span>{' '}
-              {ultimoRespaldoGithub?.branch || '-'}
-            </p>
-            <p className="md:col-span-2">
-              <span className="font-semibold text-slate-500">Ruta:</span>{' '}
-              {ultimoRespaldoGithub?.path || '-'}
-            </p>
+                <button
+                  onClick={respaldarYBorrar}
+                  disabled={guardando || cargando || respaldandoGithub}
+                  className="inline-flex items-center justify-center gap-1.5 bg-red-700 text-white px-2 py-1.5 md:px-2.5 md:py-1.5 rounded-lg text-[10px] md:text-[11px] font-semibold hover:bg-red-800 transition disabled:opacity-60"
+                >
+                  <IconoEliminar />
+                  <span>{respaldandoGithub ? 'Procesando...' : 'Respaldar y borrar'}</span>
+                </button>
+              </div>
+            </div>
           </div>
-          {ultimoRespaldoGithub?.fileUrl ? (
-            <a
-              href={ultimoRespaldoGithub.fileUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 inline-flex text-xs font-semibold text-sky-700 hover:text-sky-800 underline"
-            >
-              Ver archivo en GitHub
-            </a>
-          ) : null}
         </div>
       </div>
 
@@ -835,18 +867,19 @@ export default function AdminVecinosGrid({
           const index = indiceOriginal;
 
           return (
-            <MobileRowCard
-              key={`mobile-fila-${index}`}
-              fila={fila}
-              index={index}
-              columnas={columnas}
-              columnasCuotaExtra={columnasCuotaExtra}
-              editable={filaSeleccionada === index}
-              onSelectRow={(rowIndex) => iniciarEdicion(rowIndex, fila)}
-              guardando={guardando}
-              onChangeCell={onChangeCell}
-              onDeleteRow={onDeleteRow}
-            />
+            <div key={`mobile-fila-${index}`} data-fila-index={index}>
+              <MobileRowCard
+                fila={fila}
+                index={index}
+                columnas={columnas}
+                columnasCuotaExtra={columnasCuotaExtra}
+                editable={filaSeleccionada === index}
+                onSelectRow={(rowIndex) => iniciarEdicion(rowIndex, fila)}
+                guardando={guardando}
+                onChangeCell={onChangeCell}
+                onDeleteRow={onDeleteRow}
+              />
+            </div>
           );
         })}
 
@@ -857,7 +890,7 @@ export default function AdminVecinosGrid({
         ) : null}
       </div>
 
-      <div className="hidden md:block overflow-x-auto border border-slate-200 rounded-2xl bg-white">
+      <div className="hidden md:block overflow-x-auto border border-slate-200 rounded-xl bg-white">
         <table className="min-w-max w-full text-[11px] lg:text-xs leading-tight">
           <thead className="bg-slate-100 text-slate-700">
             <tr>
@@ -885,15 +918,26 @@ export default function AdminVecinosGrid({
               return (
                 <tr
                   key={`fila-${index}`}
+                  data-fila-index={index}
                   className={`border-t ${
                     filaActiva
                       ? 'bg-amber-50/70 border-amber-200'
+                      : filaRecienGuardada === index
+                        ? 'bg-emerald-50 border-emerald-200'
+                      : filaRecienCreada === index
+                        ? 'bg-emerald-50 border-emerald-200'
                       : 'border-slate-200'
-                  }`}
+                  } ${filaRecienGuardada === index ? 'fila-guardada-flash' : ''}`}
                 >
                   <td
                     className={`px-2 py-1.5 sticky left-0 z-10 align-top shadow-[6px_0_10px_-10px_rgba(15,23,42,0.35)] ${
-                      filaActiva ? 'bg-amber-50' : 'bg-white'
+                      filaActiva
+                        ? 'bg-amber-50'
+                        : filaRecienGuardada === index
+                          ? 'bg-emerald-50'
+                        : filaRecienCreada === index
+                          ? 'bg-emerald-50'
+                          : 'bg-white'
                     }`}
                   >
                     <div className="flex items-center gap-1 min-w-[72px]">
@@ -918,6 +962,16 @@ export default function AdminVecinosGrid({
                         <IconoEliminar />
                       </button>
                     </div>
+                    {filaRecienCreada === index ? (
+                      <span className="mt-1 inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                        Nueva
+                      </span>
+                    ) : null}
+                    {filaRecienGuardada === index ? (
+                      <span className="mt-1 inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                        Guardada
+                      </span>
+                    ) : null}
                   </td>
                   {columnas.map((columna) => {
                     const esMonto = esCampoMonetario(columna, columnasCuotaExtra);

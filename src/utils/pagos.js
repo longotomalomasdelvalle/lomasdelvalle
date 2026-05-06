@@ -84,21 +84,30 @@ export function normalizarNombrePropietario(nombre) {
 }
 
 export function obtenerParcelaYSitio(fila) {
-  const codigo = String(fila['PARC/ST'] || fila.SITIO || fila.PARCELA || '')
+  const parcelaDirecta = String(fila.PARCELA ?? '').trim();
+  const sitioDirecto = String(fila.SITIO ?? '').trim();
+  if (parcelaDirecta || sitioDirecto) {
+    return {
+      parcela: parcelaDirecta || '-',
+      sitio: sitioDirecto || '-'
+    };
+  }
+
+  const codigo = String(fila['PARC/ST'] ?? '')
     .trim()
     .toUpperCase();
 
   let parcela = '-';
   let sitio = '-';
 
-  const partes = codigo.match(/(\d+)?ST(\d+)/);
+  const partes = codigo.match(/P?(\d+)?ST(\d+)/);
 
   if (partes) {
     parcela = partes[1] || '-';
     sitio = partes[2] || '-';
   } else if (codigo.includes('ST')) {
     sitio = codigo.replace(/[^0-9]/g, '') || '-';
-  } else {
+  } else if (codigo) {
     parcela = codigo.replace(/[^0-9]/g, '') || '-';
   }
 

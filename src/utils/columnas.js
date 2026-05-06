@@ -17,7 +17,9 @@ export const NOMBRES_VISIBLES_COLUMNAS = {
   CONTACTO: 'N-CONTACTO',
   'NUMERO DE CONTACTO': 'N-CONTACTO',
   'FECHA FIRMA': 'F/FIRMA',
-  OBSERVACIONES: 'OBSERVACION'
+  OBSERVACIONES: 'OBSERVACION',
+  MAYONESA: 'MAYO',
+  MAY0: 'MAYO'
 };
 
 export const CAMPOS_RESERVADOS_COLUMNAS = new Set([
@@ -68,6 +70,10 @@ export function normalizarNombreColumna(columna) {
   // Defensivo: planillas antiguas han llegado con variantes de "RODERA".
   if (nombre === 'R' || nombre.includes('RODERA')) {
     return 'RUT';
+  }
+
+  if (nombre === 'MAYONESA' || nombre === 'MAY0') {
+    return 'MAYO';
   }
 
   return NOMBRES_VISIBLES_COLUMNAS[nombre] || nombre;
