@@ -101,10 +101,10 @@ export default function PortalPagosPasaje() {
   const [claveAdmin, setClaveAdmin] = useState('');
   const [adminVista, setAdminVista] = useState(() => {
     if (typeof window === 'undefined') {
-      return 'analitica';
+      return 'gestion';
     }
     const vistaGuardada = window.localStorage.getItem('lomas_admin_vista');
-    return vistaGuardada || 'analitica';
+    return vistaGuardada || 'gestion';
   });
   const [vecinoSeleccionadoIndice, setVecinoSeleccionadoIndice] = useState(null);
   const [tema, setTema] = useState(() => localStorage.getItem('tema_lomas') || 'claro');
@@ -177,7 +177,7 @@ export default function PortalPagosPasaje() {
     const ok = await iniciarSesion(usuarioAdmin, claveAdmin);
 
     if (ok) {
-      setAdminVista('analitica');
+      setAdminVista('gestion');
       setMostrarLogin(false);
       setUsuarioAdmin('');
       setClaveAdmin('');
@@ -239,7 +239,7 @@ export default function PortalPagosPasaje() {
     'Hola, necesito ayuda con Lomas del Valle Longotoma.'
   )}`;
   const claseContenedorPrincipal = logueado
-    ? 'h-[calc(100dvh-1px)] overflow-hidden bg-slate-100 theme-transition'
+    ? 'min-h-screen lg:h-[calc(100dvh-1px)] bg-slate-100 theme-transition'
     : 'min-h-screen bg-slate-100 p-1.5 md:p-3 xl:p-4 theme-transition';
 
   const adminNavegacion = [
@@ -261,9 +261,9 @@ export default function PortalPagosPasaje() {
   return (
     <div className={claseContenedorPrincipal}>
       <div
-        className={`w-full max-w-none mx-auto box-border ${
+        className={`w-full ${logueado ? 'max-w-none' : 'max-w-[1320px]'} mx-auto box-border ${
           logueado
-            ? 'h-full p-1 md:p-2 xl:p-2.5 flex flex-col gap-2 md:gap-2.5 overflow-hidden'
+            ? 'min-h-screen lg:h-full p-1 md:p-2 xl:p-2.5 flex flex-col gap-2 md:gap-2.5'
             : 'space-y-3 md:space-y-4'
         }`}
       >
@@ -483,28 +483,28 @@ export default function PortalPagosPasaje() {
               </div>
             </section>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden lg:sticky lg:top-2 z-30 shrink-0">
+          <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden z-30 shrink-0">
             <div className="flex items-stretch">
               <button
                 onClick={volverAlInicio}
-                className="w-[120px] md:w-[138px] shrink-0 border-r border-slate-200 bg-slate-50 flex items-center justify-center"
+                className="w-[88px] md:w-[138px] shrink-0 border-r border-slate-200 bg-slate-50 flex items-center justify-center"
                 title="Ir al inicio"
               >
                 <img
                   src="/logo-lomas-del-valle.jpg"
                   alt="Logo de Lomas del Valle"
-                  className="w-14 h-14 md:w-[66px] md:h-[66px] object-contain rounded-lg bg-white"
+                  className="w-11 h-11 md:w-[66px] md:h-[66px] object-contain rounded-lg bg-white"
                 />
               </button>
-              <div className="flex-1 min-w-0 px-3.5 py-2 md:px-4 md:py-2.5 flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0 px-2.5 py-1.5 md:px-4 md:py-2.5 flex items-center justify-between gap-2 md:gap-3">
                 <div className="min-w-0">
-                  <p className="text-[12px] text-slate-600 leading-none">
+                  <p className="text-[10px] md:text-[12px] text-slate-600 leading-none">
                     Administración · Bienvenido,{' '}
                     <span className="text-emerald-700 font-semibold">
                       {resumenAdmin?.usuario || 'Administrador'}
                     </span>
                   </p>
-                  <h1 className="text-[21px] md:text-[23px] leading-[1.05] font-semibold text-slate-900 mt-0.5">
+                  <h1 className="text-[16px] md:text-[23px] leading-[1.05] font-semibold text-slate-900 mt-0.5">
                     Lomas del Valle Longotoma
                   </h1>
                 </div>
@@ -520,11 +520,24 @@ export default function PortalPagosPasaje() {
                 </div>
               </div>
             </div>
-          </div>
+            {mostrarLogin && !logueado ? (
+              <div className="border-t border-slate-200 px-3 py-4 md:px-5 md:py-6">
+                <LoginAdmin
+                  usuarioAdmin={usuarioAdmin}
+                  claveAdmin={claveAdmin}
+                  setUsuarioAdmin={setUsuarioAdmin}
+                  setClaveAdmin={setClaveAdmin}
+                  onSubmit={iniciarSesionAdmin}
+                  error={errorLogin}
+                  cargando={cargandoLogin}
+                />
+              </div>
+            ) : null}
+          </section>
         )}
 
         {logueado ? (
-          <div className="flex-1 min-h-0 overflow-hidden lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-2.5 xl:gap-3">
+          <div className="flex-1 min-h-0 lg:overflow-hidden lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-2.5 xl:gap-3">
             <aside className="hidden lg:flex lg:flex-col rounded-2xl border border-slate-200 bg-white shadow-sm p-3">
               <div className="px-2 py-2 text-[11px] uppercase tracking-[0.2em] font-semibold text-slate-500">
                 Navegacion
@@ -554,7 +567,7 @@ export default function PortalPagosPasaje() {
               </div>
             </aside>
 
-            <div className="space-y-3 lg:pr-1 text-[13px] min-h-0 overflow-auto rounded-2xl">
+            <div className="space-y-3 lg:pr-1 text-[13px] min-h-0 overflow-visible lg:overflow-auto rounded-2xl">
               <div className="lg:hidden rounded-2xl border border-slate-200 bg-white shadow-sm p-2.5 flex items-center justify-between">
                 <button
                   onClick={() => setAdminMenuAbierto(true)}
@@ -660,18 +673,6 @@ export default function PortalPagosPasaje() {
             ) : null}
           </div>
         ) : null}
-
-        {mostrarLogin && !logueado && (
-          <LoginAdmin
-            usuarioAdmin={usuarioAdmin}
-            claveAdmin={claveAdmin}
-            setUsuarioAdmin={setUsuarioAdmin}
-            setClaveAdmin={setClaveAdmin}
-            onSubmit={iniciarSesionAdmin}
-            error={errorLogin}
-            cargando={cargandoLogin}
-          />
-        )}
 
         <ContactoModal
           abierto={mostrarContacto && !logueado}
